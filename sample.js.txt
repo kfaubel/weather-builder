@@ -1,0 +1,32 @@
+const fs = require ('fs');
+const WeatherImage = require ('./build/WeatherImage');
+
+// module requires a logger that can be part of a bigger package
+// This uses the minimal set of methods to work using just the console.
+const logger = {};
+logger.info = (...args) => {console.log(...args)};
+logger.verbose = (...args) => {console.debug(...args)};
+logger.warn = (...args) => {console.warn(...args)};
+logger.error = (...args) => {console.error(...args)};
+
+async function run() {
+    const weatherConfig = {
+        name: "Onset",
+        lat: "41.75",
+        lon: "-70.644",
+        title: "Forecast for Onset, MA",
+        days: 5
+    }
+    
+    const weatherImage = new WeatherImage(logger);
+
+    const result = await weatherImage.getImageStream(weatherConfig);
+
+    if (result !== null && result.jpegImg !== null ) {
+        fs.writeFileSync('image.jpg', result.jpegImg.data);
+    } else {
+        logger.error("No jpegImg returned from weatherImage.getImageStream")
+    }
+}
+
+run();
