@@ -1,4 +1,4 @@
-# news-builder
+# weather-builder
 This is a module for building images from NWS data.
 * It uses pureimage as an alternative to canvas.  Its slower but no native dependencies.
 
