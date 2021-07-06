@@ -1,6 +1,6 @@
 {
   "name": "weather-builder",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Create images with data from the NWS",
   "main": "index.js",
   "scripts": {
