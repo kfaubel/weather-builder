@@ -1,88 +1,99 @@
 import stream = require('stream');
-const jpeg = require('jpeg-js');
-const pure = require('pureimage');
+import { Logger } from './Logger';
+import jpeg from 'jpeg-js';
+import * as pure from 'pureimage';
+import { WeatherData } from './WeatherData';
+import path = require('path');
 
-//const WeatherData = require('./weatherdata');
-//const WeatherData = require('../src/weatherdata');
-import { WeatherData } from './weatherdata';
-const fontDir = __dirname + "/../fonts";
+export interface Config {
+    name: string;
+    lat: string;
+    lon: string;
+    title: string;
+    days: number;
+}
+
+export interface ImageResult {
+    expires: string;
+    imageType: string;
+    imageData: jpeg.BufferRet | null;
+}
 
 export class WeatherImage {
-    private weatherData: any;
+    private weatherData?: WeatherData;
+    private logger: Logger;
+    private dirname: string;
 
-    private logger;
-
-    constructor(logger: any) {
+    constructor(logger: Logger, dirname: string) {
         this.logger = logger;
+        this.dirname = dirname;
     }
 
     public setLogger(logger: any) {
         this.logger = logger;
     }
 
-    public async getImageStream(weatherRequest: any) {
-        this.logger.info(`WeatherImage: request for ${weatherRequest.name}`);
+    public async getImageStream(config: Config): Promise<ImageResult> {
+        this.logger.info(`WeatherImage: request for ${config.name}`);
         
         this.weatherData = new WeatherData(this.logger);
 
-        const result: string = await  this.weatherData.getWeatherData(weatherRequest);
+        const result: boolean = await  this.weatherData.getWeatherData(config);
 
         if (!result) {
             // tslint:disable-next-line:no-console
             this.logger.warn("Failed to get data, no image available.\n")
-            return null;
+            return {expires: "", imageType: "", imageData: null};
         }
         
         const wData = this.weatherData;
-        const imageHeight: number = 1080; // 800;
-        const imageWidth: number  = 1920; // 1280;
+        
+        const imageHeight: number = 1080; 
+        const imageWidth: number  = 1920; 
 
-        // Screen origin is the upper left corner
-        const  chartOriginX = 100;                    // In from the left edge
-        const  chartOriginY = imageHeight - 70;       // Down from the top (Was: Up from the bottom edge)
+                                                                                 // Screen origin is the upper left corner
+        const  chartOriginX = 100;                                               // In from the left edge
+        const  chartOriginY = imageHeight - 70;                                  // Down from the top (Was: Up from the bottom edge)
 
         const topLegendLeftIndent = imageWidth - 300;
 
-        // The chartWidth will be smaller than the imageWidth but must be a multiple of hoursToShow
-        // The chartHeight will be smaller than the imageHeight but must be a multiple of 100
-        const  chartWidth = 1680; // 1080;
-        const  chartHeight = 900; // 600;
+        const  chartWidth = 1680;                                                // Smaller than the imageWidth but must be a multiple of hoursToShow
+        const  chartHeight = 900;                                                // Smaller than the imageHeight but must be a multiple of 100
 
-        const  daysToShow = weatherRequest.days;                       // for 5 days (valid is 1..6)
+        const  daysToShow = config.days;                                         // for 5 days (valid is 1..6)
         
-        const  showHourGridLines = daysToShow <= 2 ? true : false;    // Only show if we are showing 2 days or less, otherwise its too crowded
+        const  showHourGridLines = daysToShow <= 2 ? true : false;               // Only show if we are showing 2 days or less, otherwise its too crowded
 
-        const  hoursToShow = daysToShow * 24;                         //   120
+        const  hoursToShow = daysToShow * 24;                                    //   120
 
-        const  verticalFineGridLines = daysToShow * 24                //   120        every 1 hours  (0-20 for 21 total vertical lines)
-        const  verticalGridLines = daysToShow * 4;                    //   20        every 6 hours  (0-20 for 21 total vertical lines)
-        const  verticalMajorGridLines = daysToShow;                         //   4         every 4th vertical lines is a day 
+        const  verticalFineGridLines = daysToShow * 24                           //   120        every 1 hours  (0-20 for 21 total vertical lines)
+        const  verticalGridLines = daysToShow * 4;                               //   20        every 6 hours  (0-20 for 21 total vertical lines)
+        const  verticalMajorGridLines = daysToShow;                              //   4         every 4th vertical lines is a day 
 
-        const  verticalFineGridSpacing = chartWidth / verticalFineGridLines; // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
-        const  verticalGridSpacing = chartWidth / verticalGridLines;         // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
+        const  verticalFineGridSpacing = chartWidth / verticalFineGridLines;     // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
+        const  verticalGridSpacing = chartWidth / verticalGridLines;             // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
         const  verticalMajorGridSpacing = chartWidth / verticalMajorGridLines;   // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
 
         const  pointsPerHour = chartWidth / hoursToShow;
 
         const  fullScaleDegrees = 100;
-        const  horizontalGridLines = fullScaleDegrees/10;             // The full scale is devided into a grid of 10. Each represents 10 degrees, percent or miles per hour
-        const  horizontalGridSpacing = chartHeight / horizontalGridLines;  // vertical spacing between the horizontal lines. 900 pixels split into 10 chunks
-        const  pointsPerDegree = chartHeight/100;
+        const  horizontalGridLines = fullScaleDegrees/10;                        // The full scale is devided into a grid of 10. Each represents 10 degrees, percent or miles per hour
+        const  horizontalGridSpacing = chartHeight / horizontalGridLines;        // vertical spacing between the horizontal lines. 900 pixels split into 10 chunks
+        const  pointsPerDegree = chartHeight/100;                                // vertical pixels per degree temp
 
-        const sunOriginX = 100;
-        const sunOriginY = chartOriginY - chartHeight - 8;
-        
-        const moonOriginX = 100;
-        const moonOriginY = chartOriginY - chartHeight - 16;
+        const  fullScaleRain = 0.64;                                             //  Slight rain:      trace        - 0.02 in/hour
+                                                                                 //  Moderate rain:    0.02 in/hour - 0.80 in/hour
+                                                                                 //  Heavy rain:       0.80 in/hour - 0.32 in/hour <== this should be our midpoint
+                                                                                 //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
         
         const largeFont: string  = "48px 'OpenSans-Bold'";   // Title
         const mediumFont: string = "36px 'OpenSans-Bold'";   // axis labels
         const smallFont: string  = "24px 'OpenSans-Bold'";   // Legend at the top
 
-        const fntBold     = pure.registerFont(fontDir + '/OpenSans-Bold.ttf','OpenSans-Bold');
-        const fntRegular  = pure.registerFont(fontDir + '/OpenSans-Regular.ttf','OpenSans-Regular');
-        const fntRegular2 = pure.registerFont(fontDir + '/alata-regular.ttf','alata-regular');
-
+        const fntBold = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),'OpenSans-Bold');
+        const fntRegular = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),'OpenSans-Regular');
+        const fntRegular2 = pure.registerFont(path.join(this.dirname, "..", "fonts", "alata-regular.ttf"),'alata-regular');
+        
         fntBold.loadSync();
         fntRegular.loadSync();
         fntRegular2.loadSync();
@@ -118,8 +129,8 @@ export class WeatherImage {
         // Draw the title
         ctx.fillStyle = titleColor;
         ctx.font = largeFont;
-        const textWidth: number = ctx.measureText(weatherRequest.title).width;
-        ctx.fillText(weatherRequest.title, (imageWidth - textWidth) / 2, 60);
+        const textWidth: number = ctx.measureText(config.title).width;
+        ctx.fillText(config.title, (imageWidth - textWidth) / 2, 60);
 
         // Draw the color key labels        
         ctx.font = smallFont;
@@ -138,28 +149,25 @@ export class WeatherImage {
         let endX: number;
         let endY: number;
 
-        // We need to skip past the time that has past today.  Start at current hour.
-        const firstHour: number = new Date().getHours(); // 0-23
-        // this.logger.info("First Hour: " + firstHour);
-
-        //
-        // Draw the cloud cover in the background (filled)
-        //
-        ctx.fillStyle = 'rgb(50, 50, 50)';
-
+        
         // if there are 120 hours to show, and first hour is 0
         // we want to access wData in the range 0-119
         // since each iteration uses i and i+1, we want to loop from 0-118
         //
         // if we start 10 hours into the day, we will loop from 0-109
+        //
+        // We need to skip past the time that has past today.  Start at current hour
         // We do start plotting the data firstHour * pointsPerHour after the y axis
+        const firstHour: number = new Date().getHours(); // 0-23
+        
+        // Draw the cloud cover in the background (filled)
+        ctx.fillStyle = 'rgb(50, 50, 50)';
+        
         for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - wData.cloudCover(i) * pointsPerDegree;
             endY   = chartOriginY - wData.cloudCover(i + 1) * pointsPerDegree;
-
-            // console.log("Cover: [" + i + "] = " + " StartX: " + startX + " EndX: " + endX);
 
             ctx.beginPath();
             ctx.moveTo(startX, chartOriginY);          // Start at bottom left
@@ -183,25 +191,15 @@ export class WeatherImage {
         ctx.lineTo(startX, chartOriginY);          // back to the bottom left
         ctx.fill();
 
-        //
         // Draw the probability of precipitation at the bottom.  The rain amount will cover part of this up.
-        //
         ctx.fillStyle = 'rgb(40, 60, 100)';  // A little more blue
 
-        // if there are 120 hours to show, and first hour is 0
-        // we want to access wData in the range 0-119
-        // since each iteration uses i and i+1, we want to loop from 0-118
-        //
-        // if we start 10 hours into the day, we will loop from 0-109
-        // We do start plotting the data firstHour * pointsPerHour after the y axis
         for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - wData.precipProb(i)  * pointsPerDegree;
             endY = chartOriginY - wData.precipProb(i + 1)  * pointsPerDegree;
 
-            // this.logger.info("Cover: [" + i + "] = " + " StartX: " + startX + " Precip: " + wData.precipAmt(i) + " Y1: " + (chartOriginY - startY) + " Y2: " + (chartOriginY - endY));
-
             ctx.beginPath();
             ctx.moveTo(startX, chartOriginY);          // Start at bottom left
             ctx.lineTo(startX, startY);     // Up to the height of startY
@@ -211,24 +209,15 @@ export class WeatherImage {
             ctx.fill();
         }
 
-        //
         // Draw the rain amount in the background over the clouds (filled)
-        //
-        ctx.fillStyle = 'rgb(40, 130, 150)';  // A little more blue
+        ctx.fillStyle = 'rgb(40, 130, 150)';  // A little more blue        
 
-        // if there are 120 hours to show, and first hour is 0
-        // we want to access wData in the range 0-119
-        // since each iteration uses i and i+1, we want to loop from 0-118
-        //
-        // if we start 10 hours into the day, we will loop from 0-109
-        // We do start plotting the data firstHour * pointsPerHour after the y axis
         for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
-            startY = chartOriginY - wData.precipAmt(i)  * pointsPerDegree;
-            endY = chartOriginY - wData.precipAmt(i + 1)  * pointsPerDegree;
-
-            // this.logger.info("Cover: [" + i + "] = " + " StartX: " + startX + " Precip: " + wData.precipAmt(i) + " Y1: " + (chartOriginY - startY) + " Y2: " + (chartOriginY - endY));
+            this.logger.log(`QPF: ${i} ${wData.precipAmt(i)}`)
+            startY = chartOriginY - Math.min(wData.precipAmt(i)   *  chartHeight/fullScaleRain, chartHeight); 
+            endY   = chartOriginY - Math.min(wData.precipAmt(i+1)  * chartHeight/fullScaleRain, chartHeight);
 
             ctx.beginPath();
             ctx.moveTo(startX, chartOriginY);          // Start at bottom left
@@ -239,10 +228,11 @@ export class WeatherImage {
             ctx.fill();
         }
 
+        // Draw the last slice
         startX = chartOriginX + (hoursToShow -1) * pointsPerHour;
         endX   = chartOriginX + (hoursToShow) * pointsPerHour;
-        startY = chartOriginY - wData.precipAmt(hoursToShow - 1) * pointsPerDegree;
-        endY   = chartOriginY - wData.precipAmt(hoursToShow) * pointsPerDegree;
+        startY = chartOriginY - Math.min(wData.precipAmt(hoursToShow - 1)  * chartHeight/fullScaleRain, chartHeight); //wData.precipAmt(hoursToShow - 1) * pointsPerInch;
+        endY   = chartOriginY - Math.min(wData.precipAmt(hoursToShow)      * chartHeight/fullScaleRain, chartHeight); //wData.precipAmt(hoursToShow) * pointsPerInch;
 
         ctx.beginPath();
         ctx.moveTo(startX, chartOriginY);          // Start at bottom left
@@ -334,9 +324,9 @@ export class WeatherImage {
         // Draw an orange line at 75 degrees
         ctx.strokeStyle = 'orange';
         startX = chartOriginX;
-        endX = chartOriginX + chartWidth;
+        endX   = chartOriginX + chartWidth;
         startY = chartOriginY - (horizontalGridSpacing * 75) / 10;
-        endY = chartOriginY - (horizontalGridSpacing * 75) / 10;
+        endY   = chartOriginY - (horizontalGridSpacing * 75) / 10;
 
         ctx.beginPath();
         ctx.moveTo(startX, startY);
@@ -419,18 +409,11 @@ export class WeatherImage {
         const expires = new Date();
         expires.setHours(expires.getHours() + 2);
 
-        const jpegImg = await jpeg.encode(img, 50);
-
-        const jpegStream = new stream.Readable({
-            read() {
-                this.push(jpegImg.data);
-                this.push(null);
-            }
-        })
+        const jpegImg = jpeg.encode(img, 50);
         
         return {
-            jpegImg: jpegImg,
-            stream:  jpegStream,
+            imageData: jpegImg,
+            imageType: "jpg", 
             expires: expires.toUTCString()
         }
     }

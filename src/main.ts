@@ -1,19 +1,15 @@
 import stream = require('stream');
 import util = require('util');
 import fs from 'fs';
-import { WeatherImage } from './weatherimage';
+import { Config, WeatherImage } from './WeatherImage';
 import { Logger } from "./Logger";
+import axios, { AxiosResponse } from 'axios';
 
-// Create a new express application instance
 async function run() {
-    // const app: express.Application = express();
-
-    // const weatherConfig: any = {
+    // const config: any = {
     //     agent: "ken@faubel.org",
     //     lat: "41.7476",
     //     lon: "-70.6676",
-    //     //zip: "01827",
-    //     //mapQuestKey: mapQuestKey.mapQuestKey,
     //     title: "Forecast for Onset, MA"
     // }
 
@@ -22,7 +18,7 @@ async function run() {
     
     const logger: Logger = new Logger("weather-builder"); 
 
-    const weatherConfig: any = {
+    const weatherConfig: Config = {
         name: "Onset",
         lat: "41.75",
         lon: "-70.644",
@@ -30,36 +26,44 @@ async function run() {
         days: 5
     }
    
-    const weatherImage = new WeatherImage(logger);
+    const weatherImage = new WeatherImage(logger, __dirname);
 
     const result = await weatherImage.getImageStream(weatherConfig);
     
     // We now get result.jpegImg
     logger.info(`Writing: image.jpg`);
 
-    if (result !== null && result.jpegImg !== null ) {
-        fs.writeFileSync('image.jpg', result.jpegImg.data);
+    if (result !== null && result.imageData !== null ) {
+        fs.writeFileSync('image.jpg', result.imageData.data);
     } else {
-        logger.error("test.ts: no jpegImg returned from weatherImage.getImageStream");
-        process.exit(1);
-    }
-
-    if (result !== null && result.stream !== null ) {
-        logger.info(`Writing from stream: image2.jpg`);
-
-        const out = fs.createWriteStream('image2.jpg');
-        const finished = util.promisify(stream.finished);
-
-        result.stream.pipe(out);
-        out.on('finish', () =>  logger.info('The jpg from a stream file was created.'));
-
-        await finished(out); 
-    } else {
-        logger.error("test.ts: no stream returned from weatherImage.getImageStream");
+        logger.error("test.ts: no imageData returned from weatherImage.getImageStream");
         process.exit(1);
     }
     
     logger.info("done"); 
+}
+
+// if we need to do a zip lookup, do it here or add a new module.
+async function getLatLon(logger: Logger, zip: string, mapQuestKey: string): Promise<any> {
+    let lat = "";
+    let lon = "";
+    
+    try {
+        if (zip !== undefined  && mapQuestKey !== undefined) {
+            const mapQuestUrl = `http://www.mapquestapi.com/geocoding/v1/address?key=${mapQuestKey}&location=${zip}`
+            logger.info("Mapquest URL: " + mapQuestUrl);
+
+            const response: AxiosResponse=  await axios.get(mapQuestUrl);
+
+        
+            lat = response.data.results[0].locations[0].latLng.lat;
+            lon = response.data.results[0].locations[0].latLng.lng;
+        } 
+    } catch (e) {
+        logger.error(`Failed to get lat/lon from MapQuest: ${e}`);
+    }
+
+    return ({lat: lat, lon: lon});
 }
 
 run();
