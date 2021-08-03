@@ -1,11 +1,10 @@
-import stream = require('stream');
 import { Logger } from './Logger';
 import jpeg from 'jpeg-js';
 import * as pure from 'pureimage';
 import { WeatherData } from './WeatherData';
 import path = require('path');
 
-export interface Config {
+export interface WeatherLocation {
     name: string;
     lat: string;
     lon: string;
@@ -33,12 +32,12 @@ export class WeatherImage {
         this.logger = logger;
     }
 
-    public async getImageStream(config: Config): Promise<ImageResult> {
-        this.logger.info(`WeatherImage: request for ${config.name}`);
+    public async getImageStream(weatherLocation: WeatherLocation): Promise<ImageResult> {
+        this.logger.info(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
 
-        const result: boolean = await  this.weatherData.getWeatherData(config);
+        const result: boolean = await  this.weatherData.getWeatherData(weatherLocation);
 
         if (!result) {
             // tslint:disable-next-line:no-console
@@ -60,7 +59,7 @@ export class WeatherImage {
         const  chartWidth = 1680;                                                // Smaller than the imageWidth but must be a multiple of hoursToShow
         const  chartHeight = 900;                                                // Smaller than the imageHeight but must be a multiple of 100
 
-        const  daysToShow = config.days;                                         // for 5 days (valid is 1..6)
+        const  daysToShow = weatherLocation.days;                                         // for 5 days (valid is 1..6)
         
         const  showHourGridLines = daysToShow <= 2 ? true : false;               // Only show if we are showing 2 days or less, otherwise its too crowded
 
@@ -90,8 +89,8 @@ export class WeatherImage {
         const mediumFont: string = "36px 'OpenSans-Bold'";   // axis labels
         const smallFont: string  = "24px 'OpenSans-Bold'";   // Legend at the top
 
-        const fntBold = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),'OpenSans-Bold');
-        const fntRegular = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),'OpenSans-Regular');
+        const fntBold     = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),'OpenSans-Bold');
+        const fntRegular  = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),'OpenSans-Regular');
         const fntRegular2 = pure.registerFont(path.join(this.dirname, "..", "fonts", "alata-regular.ttf"),'alata-regular');
         
         fntBold.loadSync();
@@ -129,8 +128,8 @@ export class WeatherImage {
         // Draw the title
         ctx.fillStyle = titleColor;
         ctx.font = largeFont;
-        const textWidth: number = ctx.measureText(config.title).width;
-        ctx.fillText(config.title, (imageWidth - textWidth) / 2, 60);
+        const textWidth: number = ctx.measureText(weatherLocation.title).width;
+        ctx.fillText(weatherLocation.title, (imageWidth - textWidth) / 2, 60);
 
         // Draw the color key labels        
         ctx.font = smallFont;

@@ -1,7 +1,5 @@
-import stream = require('stream');
-import util = require('util');
 import fs from 'fs';
-import { Config, WeatherImage } from './WeatherImage';
+import { WeatherLocation, WeatherImage } from './WeatherImage';
 import { Logger } from "./Logger";
 import axios, { AxiosResponse } from 'axios';
 
@@ -18,7 +16,7 @@ async function run() {
     
     const logger: Logger = new Logger("weather-builder"); 
 
-    const weatherConfig: Config = {
+    const weatherConfig: WeatherLocation = {
         name: "Onset",
         lat: "41.75",
         lon: "-70.644",

@@ -1,7 +1,7 @@
 import xml2js from 'xml2js';
 import axios, { AxiosResponse } from 'axios';
 import { Logger } from './Logger';
-import { Config } from './WeatherImage';
+import { WeatherLocation } from './WeatherImage';
 
 // Onset" https://forecast.weather.gov/MapClick.php?lat=41.7476&lon=-70.6676&FcstType=digitalDWML
 // NOLA   https://forecast.weather.gov/MapClick.php?lat=29.9537&lon=-90.0777&FcstType=digitalDWML
@@ -44,7 +44,7 @@ export class WeatherData {
     public windSpeed  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["wind-speed"][0].value[index]};
     public precipAmt  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["hourly-qpf"][0].value[index]};
 
-    public async getWeatherData(config: Config): Promise<boolean> {
+    public async getWeatherData(config: WeatherLocation): Promise<boolean> {
         if (config.lat === undefined || config.lon === undefined) {
             this.logger.error("No lat/lon provided.")
             return false;
