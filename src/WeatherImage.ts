@@ -1,8 +1,8 @@
-import { Logger } from './Logger';
-import jpeg from 'jpeg-js';
-import * as pure from 'pureimage';
-import { WeatherData } from './WeatherData';
-import path = require('path');
+import { Logger } from "./Logger";
+import jpeg from "jpeg-js";
+import * as pure from "pureimage";
+import { WeatherData } from "./WeatherData";
+import path = require("path");
 
 export interface WeatherLocation {
     name: string;
@@ -27,12 +27,8 @@ export class WeatherImage {
         this.logger = logger;
         this.dirname = dirname;
     }
-
-    public setLogger(logger: any) {
-        this.logger = logger;
-    }
-
-    public async getImageStream(weatherLocation: WeatherLocation): Promise<ImageResult> {
+    
+    public async getImage(weatherLocation: WeatherLocation): Promise<ImageResult> {
         this.logger.info(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
@@ -41,16 +37,16 @@ export class WeatherImage {
 
         if (!result) {
             // tslint:disable-next-line:no-console
-            this.logger.warn("Failed to get data, no image available.\n")
+            this.logger.warn("Failed to get data, no image available.\n");
             return {expires: "", imageType: "", imageData: null};
         }
         
         const wData = this.weatherData;
         
-        const imageHeight: number = 1080; 
-        const imageWidth: number  = 1920; 
+        const imageHeight = 1080; 
+        const imageWidth  = 1920; 
 
-                                                                                 // Screen origin is the upper left corner
+        // Screen origin is the upper left corner
         const  chartOriginX = 100;                                               // In from the left edge
         const  chartOriginY = imageHeight - 70;                                  // Down from the top (Was: Up from the bottom edge)
 
@@ -65,7 +61,7 @@ export class WeatherImage {
 
         const  hoursToShow = daysToShow * 24;                                    //   120
 
-        const  verticalFineGridLines = daysToShow * 24                           //   120        every 1 hours  (0-20 for 21 total vertical lines)
+        const  verticalFineGridLines = daysToShow * 24;                           //   120        every 1 hours  (0-20 for 21 total vertical lines)
         const  verticalGridLines = daysToShow * 4;                               //   20        every 6 hours  (0-20 for 21 total vertical lines)
         const  verticalMajorGridLines = daysToShow;                              //   4         every 4th vertical lines is a day 
 
@@ -81,36 +77,36 @@ export class WeatherImage {
         const  pointsPerDegree = chartHeight/100;                                // vertical pixels per degree temp
 
         const  fullScaleRain = 0.64;                                             //  Slight rain:      trace        - 0.02 in/hour
-                                                                                 //  Moderate rain:    0.02 in/hour - 0.80 in/hour
-                                                                                 //  Heavy rain:       0.80 in/hour - 0.32 in/hour <== this should be our midpoint
-                                                                                 //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
+        //  Moderate rain:    0.02 in/hour - 0.80 in/hour
+        //  Heavy rain:       0.80 in/hour - 0.32 in/hour <== this should be our midpoint
+        //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
         
-        const largeFont: string  = "48px 'OpenSans-Bold'";   // Title
-        const mediumFont: string = "36px 'OpenSans-Bold'";   // axis labels
-        const smallFont: string  = "24px 'OpenSans-Bold'";   // Legend at the top
+        const largeFont  = "48px 'OpenSans-Bold'";   // Title
+        const mediumFont = "36px 'OpenSans-Bold'";   // axis labels
+        const smallFont  = "24px 'OpenSans-Bold'";   // Legend at the top
 
-        const fntBold     = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),'OpenSans-Bold');
-        const fntRegular  = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),'OpenSans-Regular');
-        const fntRegular2 = pure.registerFont(path.join(this.dirname, "..", "fonts", "alata-regular.ttf"),'alata-regular');
+        const fntBold     = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),"OpenSans-Bold");
+        const fntRegular  = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),"OpenSans-Regular");
+        const fntRegular2 = pure.registerFont(path.join(this.dirname, "..", "fonts", "alata-regular.ttf"),"alata-regular");
         
         fntBold.loadSync();
         fntRegular.loadSync();
         fntRegular2.loadSync();
 
-        const thinStroke: number = 1;
-        const regularStroke: number = 3;
-        const heavyStroke: number = 5;
+        const thinStroke = 1;
+        const regularStroke = 3;
+        const heavyStroke = 5;
 
-        const backgroundColor: string     = 'rgb(0, 0, 30)';
-        const titleColor: string          = 'white';
-        const gridLinesColor: string      = 'rgb(100, 100, 100)';
-        const majorGridLinesColor: string = 'rgb(150, 150, 150)';
-        const temperatureColor: string    = 'rgb(255, 40, 40)';
-        const dewPointColor: string       = 'rgb(140, 240, 0)';
-        const windSpeedColor: string      = 'yellow';
+        const backgroundColor     = "rgb(0, 0, 30)";
+        const titleColor          = "white";
+        const gridLinesColor      = "rgb(100, 100, 100)";
+        const majorGridLinesColor = "rgb(150, 150, 150)";
+        const temperatureColor    = "rgb(255, 40, 40)";
+        const dewPointColor       = "rgb(140, 240, 0)";
+        const windSpeedColor      = "yellow";
 
         const img = pure.make(imageWidth, imageHeight);
-        const ctx = img.getContext('2d');
+        const ctx = img.getContext("2d");
 
         // Canvas reference
         // origin is upper right
@@ -160,9 +156,9 @@ export class WeatherImage {
         const firstHour: number = new Date().getHours(); // 0-23
         
         // Draw the cloud cover in the background (filled)
-        ctx.fillStyle = 'rgb(50, 50, 50)';
+        ctx.fillStyle = "rgb(50, 50, 50)";
         
-        for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
+        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - wData.cloudCover(i) * pointsPerDegree;
@@ -191,9 +187,9 @@ export class WeatherImage {
         ctx.fill();
 
         // Draw the probability of precipitation at the bottom.  The rain amount will cover part of this up.
-        ctx.fillStyle = 'rgb(40, 60, 100)';  // A little more blue
+        ctx.fillStyle = "rgb(40, 60, 100)";  // A little more blue
 
-        for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
+        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - wData.precipProb(i)  * pointsPerDegree;
@@ -209,9 +205,9 @@ export class WeatherImage {
         }
 
         // Draw the rain amount in the background over the clouds (filled)
-        ctx.fillStyle = 'rgb(40, 130, 150)';  // A little more blue        
+        ctx.fillStyle = "rgb(40, 130, 150)";  // A little more blue        
 
-        for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
+        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - Math.min(wData.precipAmt(i)   *  chartHeight/fullScaleRain, chartHeight); 
@@ -246,7 +242,7 @@ export class WeatherImage {
         if (showHourGridLines) {
             ctx.strokeStyle = gridLinesColor;
             ctx.lineWidth = thinStroke;
-            for (let i: number = 0; i <= verticalFineGridLines; i++) {
+            for (let i = 0; i <= verticalFineGridLines; i++) {
                 startX = chartOriginX + (i * verticalFineGridSpacing);
                 endX = chartOriginX + (i * verticalFineGridSpacing);
                 startY = chartOriginY;
@@ -262,7 +258,7 @@ export class WeatherImage {
         // Draw the regular vertical lines
         ctx.strokeStyle = gridLinesColor;
         ctx.lineWidth = regularStroke;
-        for (let i: number = 0; i <= verticalGridLines; i++) {
+        for (let i = 0; i <= verticalGridLines; i++) {
             startX = chartOriginX + (i * verticalGridSpacing);
             endX = chartOriginX + (i * verticalGridSpacing);
             startY = chartOriginY;
@@ -277,7 +273,7 @@ export class WeatherImage {
         // Draw the major vertical lines
         ctx.strokeStyle = majorGridLinesColor;
         ctx.lineWidth = heavyStroke;
-        for (let i: number = 0; i <= verticalGridLines; i ++) {
+        for (let i = 0; i <= verticalGridLines; i ++) {
             startX = chartOriginX + (i * verticalMajorGridSpacing);
             endX = chartOriginX + (i * verticalMajorGridSpacing);
             startY = chartOriginY;
@@ -292,7 +288,7 @@ export class WeatherImage {
         // Draw the horizontal lines
         ctx.strokeStyle = gridLinesColor;
         ctx.lineWidth = regularStroke;
-        for (let i: number = 0; i <= horizontalGridLines; i++) {
+        for (let i = 0; i <= horizontalGridLines; i++) {
             startX = chartOriginX;
             endX = chartOriginX + chartWidth;
             startY = chartOriginY - (i * horizontalGridSpacing);
@@ -307,7 +303,7 @@ export class WeatherImage {
         // Draw the major horizontal lines (typically at 0 and 100)
         ctx.strokeStyle = majorGridLinesColor;
         ctx.lineWidth = heavyStroke;
-        for (let i: number = 0; i <= 1; i++) {
+        for (let i = 0; i <= 1; i++) {
             startX = chartOriginX;
             endX   = chartOriginX + chartWidth;
             startY = chartOriginY - (i * chartHeight);
@@ -320,7 +316,7 @@ export class WeatherImage {
         }
 
         // Draw an orange line at 75 degrees
-        ctx.strokeStyle = 'orange';
+        ctx.strokeStyle = "orange";
         startX = chartOriginX;
         endX   = chartOriginX + chartWidth;
         startY = chartOriginY - (horizontalGridSpacing * 75) / 10;
@@ -332,7 +328,7 @@ export class WeatherImage {
         ctx.stroke();
 
         // Draw an blue line at 32 degrees
-        ctx.strokeStyle = 'rgb(0, 0, 200)';
+        ctx.strokeStyle = "rgb(0, 0, 200)";
         startX = chartOriginX;
         endX = chartOriginX + chartWidth;
         startY = chartOriginY - (horizontalGridSpacing * 32) / 10;
@@ -345,9 +341,9 @@ export class WeatherImage {
 
         // Draw the axis labels
         ctx.font = mediumFont;
-        ctx.fillStyle = 'rgb(200, 200, 200)';
+        ctx.fillStyle = "rgb(200, 200, 200)";
 
-        for (let i: number = 0; i <= horizontalGridLines; i++) {
+        for (let i = 0; i <= horizontalGridLines; i++) {
             // i = 0, 1 ..10    labelString = "0", "10" .. "100"
             const labelString: string = (i * (fullScaleDegrees/horizontalGridLines)).toString(); 
 
@@ -357,9 +353,9 @@ export class WeatherImage {
             ctx.fillText(labelString, x - labelStringWdth / 2, y);
         }       
 
-        const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-        for (let i: number = 0; i < (hoursToShow / 24); i++) {
+        for (let i = 0; i < (hoursToShow / 24); i++) {
             const date = new Date(Date.parse(wData.timeString(i * 24)));
             const dayStr: string = weekday[date.getDay()];
             const dayStrWdth: number = ctx.measureText(dayStr).width;
@@ -378,7 +374,7 @@ export class WeatherImage {
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.temperature(0) * chartHeight) / fullScaleDegrees);
         
-        for (let i: number =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.temperature(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.temperature(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
@@ -388,7 +384,7 @@ export class WeatherImage {
         ctx.strokeStyle = dewPointColor;
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.dewPoint(0) * chartHeight) / fullScaleDegrees);
-        for (let i: number =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.dewPoint(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.dewPoint(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);        
@@ -398,7 +394,7 @@ export class WeatherImage {
         ctx.strokeStyle = windSpeedColor;
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.windSpeed(0) * chartHeight) / fullScaleDegrees);
-        for (let i: number =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.windSpeed(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.windSpeed(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
@@ -413,6 +409,6 @@ export class WeatherImage {
             imageData: jpegImg,
             imageType: "jpg", 
             expires: expires.toUTCString()
-        }
+        };
     }
 }

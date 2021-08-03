@@ -1,7 +1,7 @@
-import xml2js from 'xml2js';
-import axios, { AxiosResponse } from 'axios';
-import { Logger } from './Logger';
-import { WeatherLocation } from './WeatherImage';
+import xml2js from "xml2js";
+import axios, { AxiosResponse } from "axios";
+import { Logger } from "./Logger";
+import { WeatherLocation } from "./WeatherImage";
 
 // Onset" https://forecast.weather.gov/MapClick.php?lat=41.7476&lon=-70.6676&FcstType=digitalDWML
 // NOLA   https://forecast.weather.gov/MapClick.php?lat=29.9537&lon=-90.0777&FcstType=digitalDWML
@@ -10,8 +10,8 @@ import { WeatherLocation } from './WeatherImage';
 // Not all data is present
 
 export class WeatherData {
-    private lat: string = "";
-    private lon: string = "";
+    private lat = "";
+    private lon = "";
     private weatherJson: any = null; 
 
     private logger: Logger;
@@ -36,17 +36,17 @@ export class WeatherData {
     // for heat index, no index if weatherJson.dwml.data.parameters.temperature[1].value[i]._attributes["xsi:nil"] == "true"
     // for wind gusts, no gusts if weatherJson.dwml.data.parameters.wind-speed[1].value[i]._attributes["xsi:nil"] == "true"
 
-    public timeString (index: number): string {return this.weatherJson.dwml.data[0]["time-layout"][0]["start-valid-time"][index]};
-    public temperature(index: number): number {return this.weatherJson.dwml.data[0].parameters[0].temperature[2].value[index]};
-    public dewPoint   (index: number): number {return this.weatherJson.dwml.data[0].parameters[0].temperature[0].value[index]};
-    public cloudCover (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["cloud-amount"][0].value[index]};
-    public precipProb (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["probability-of-precipitation"][0].value[index]};
-    public windSpeed  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["wind-speed"][0].value[index]};
-    public precipAmt  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["hourly-qpf"][0].value[index]};
+    public timeString (index: number): string {return this.weatherJson.dwml.data[0]["time-layout"][0]["start-valid-time"][index];}
+    public temperature(index: number): number {return this.weatherJson.dwml.data[0].parameters[0].temperature[2].value[index];}
+    public dewPoint   (index: number): number {return this.weatherJson.dwml.data[0].parameters[0].temperature[0].value[index];}
+    public cloudCover (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["cloud-amount"][0].value[index];}
+    public precipProb (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["probability-of-precipitation"][0].value[index];}
+    public windSpeed  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["wind-speed"][0].value[index];}
+    public precipAmt  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["hourly-qpf"][0].value[index];}
 
     public async getWeatherData(config: WeatherLocation): Promise<boolean> {
         if (config.lat === undefined || config.lon === undefined) {
-            this.logger.error("No lat/lon provided.")
+            this.logger.error("No lat/lon provided.");
             return false;
         }
 
@@ -61,17 +61,17 @@ export class WeatherData {
         let NWS_USER_AGENT: string | undefined = process.env.NWS_USER_AGENT;
 
         if (NWS_USER_AGENT === undefined) {
-            this.logger.warn(`WeatherData: NWS_USER_AGENT is not defined in the env, should be an email address`);
+            this.logger.warn("WeatherData: NWS_USER_AGENT is not defined in the env, should be an email address");
         } else {
             NWS_USER_AGENT = "test@test.com";
         }
 
         const headers = {
-            'Access-Control-Allow-Origin': '*',
-            'User-agent': NWS_USER_AGENT
+            "Access-Control-Allow-Origin": "*",
+            "User-agent": NWS_USER_AGENT
         };
 
-        this.logger.info(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`)
+        this.logger.info(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
 
         try {
             const response: AxiosResponse = await axios.get(url);
