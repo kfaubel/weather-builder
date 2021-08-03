@@ -43,6 +43,8 @@
   "homepage": "https://github.com/kfaubel/weather-builder#readme",
   "files": [
     "build/**/*",
-    "fonts/**/*"
+    "fonts/**/*",
+    "index.js",
+    "index.d.ts"
   ]
 }
