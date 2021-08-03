@@ -214,7 +214,6 @@ export class WeatherImage {
         for (let i: number = 0; i < (hoursToShow - firstHour - 1); i++) {
             startX = chartOriginX + (i + firstHour) * pointsPerHour;
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
-            this.logger.log(`QPF: ${i} ${wData.precipAmt(i)}`)
             startY = chartOriginY - Math.min(wData.precipAmt(i)   *  chartHeight/fullScaleRain, chartHeight); 
             endY   = chartOriginY - Math.min(wData.precipAmt(i+1)  * chartHeight/fullScaleRain, chartHeight);
 
