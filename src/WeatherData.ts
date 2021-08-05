@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import xml2js from "xml2js";
 import axios, { AxiosResponse } from "axios";
-import { Logger } from "./Logger";
+import { LoggerInterface } from "./Logger";
 import { WeatherLocation } from "./WeatherImage";
 
 // Onset" https://forecast.weather.gov/MapClick.php?lat=41.7476&lon=-70.6676&FcstType=digitalDWML
@@ -14,9 +15,9 @@ export class WeatherData {
     private lon = "";
     private weatherJson: any = null; 
 
-    private logger: Logger;
+    private logger: LoggerInterface;
 
-    constructor(logger: Logger) {
+    constructor(logger: LoggerInterface) {
         this.logger = logger;
     }    
 
@@ -67,14 +68,13 @@ export class WeatherData {
         }
 
         const headers = {
-            "Access-Control-Allow-Origin": "*",
             "User-agent": NWS_USER_AGENT
         };
 
         this.logger.info(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
 
         try {
-            const response: AxiosResponse = await axios.get(url);
+            const response: AxiosResponse = await axios.get(url, {headers: {headers}});
             
             const parser = new xml2js.Parser(/* options */);
             this.weatherJson = await parser.parseStringPromise(response.data);

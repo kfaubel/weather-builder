@@ -1,4 +1,4 @@
-import { Logger } from "./Logger";
+import { LoggerInterface } from "./Logger";
 import jpeg from "jpeg-js";
 import * as pure from "pureimage";
 import { WeatherData } from "./WeatherData";
@@ -20,10 +20,10 @@ export interface ImageResult {
 
 export class WeatherImage {
     private weatherData?: WeatherData;
-    private logger: Logger;
+    private logger: LoggerInterface;
     private dirname: string;
 
-    constructor(logger: Logger, dirname: string) {
+    constructor(logger: LoggerInterface, dirname: string) {
         this.logger = logger;
         this.dirname = dirname;
     }
@@ -77,8 +77,8 @@ export class WeatherImage {
         const  pointsPerDegree = chartHeight/100;                                // vertical pixels per degree temp
 
         const  fullScaleRain = 0.64;                                             //  Slight rain:      trace        - 0.02 in/hour
-        //  Moderate rain:    0.02 in/hour - 0.80 in/hour
-        //  Heavy rain:       0.80 in/hour - 0.32 in/hour <== this should be our midpoint
+        //  Moderate rain:    0.02 in/hour - 0.08 in/hour
+        //  Heavy rain:       0.08 in/hour - 0.32 in/hour <== this should be our midpoint
         //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
         
         const largeFont  = "48px 'OpenSans-Bold'";   // Title
@@ -212,6 +212,7 @@ export class WeatherImage {
             endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
             startY = chartOriginY - Math.min(wData.precipAmt(i)   *  chartHeight/fullScaleRain, chartHeight); 
             endY   = chartOriginY - Math.min(wData.precipAmt(i+1)  * chartHeight/fullScaleRain, chartHeight);
+            //this.logger.info(`Rain at ${i} = ${wData.precipAmt(i)}`);
 
             ctx.beginPath();
             ctx.moveTo(startX, chartOriginY);          // Start at bottom left

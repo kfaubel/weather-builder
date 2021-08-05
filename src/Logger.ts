@@ -1,3 +1,13 @@
+"use strict";
+export interface LoggerInterface {
+    error(text: string): void;
+    warn(text: string): void;
+    log(text: string): void;
+    info(text: string): void;
+    verbose(text: string): void;
+    trace(text: string): void;
+}
+
 export class Logger {
     private module: string;
     private level = 2;
@@ -9,10 +19,7 @@ export class Logger {
 
     constructor(module: string, levelStr = "info") {
         this.module = module;
-        this.setLevel(levelStr);        
-    }
-    
-    public setLevel(levelStr: string): void {
+
         switch (levelStr) {
         case "error":   this.level = this._ERROR; break;
         case "warn":    this.level = this._WARN; break;

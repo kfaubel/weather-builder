@@ -1,1 +1,1 @@
-declare module 'pureimage';
+declare module "pureimage";
