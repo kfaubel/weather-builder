@@ -1,4 +1,3 @@
-"use strict";
 export interface LoggerInterface {
     error(text: string): void;
     warn(text: string): void;

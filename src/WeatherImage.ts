@@ -21,11 +21,9 @@ export interface ImageResult {
 export class WeatherImage {
     private weatherData?: WeatherData;
     private logger: LoggerInterface;
-    private dirname: string;
 
-    constructor(logger: LoggerInterface, dirname: string) {
+    constructor(logger: LoggerInterface) {
         this.logger = logger;
-        this.dirname = dirname;
     }
     
     public async getImage(weatherLocation: WeatherLocation): Promise<ImageResult> {
@@ -85,9 +83,10 @@ export class WeatherImage {
         const mediumFont = "36px 'OpenSans-Bold'";   // axis labels
         const smallFont  = "24px 'OpenSans-Bold'";   // Legend at the top
 
-        const fntBold     = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Bold.ttf"),"OpenSans-Bold");
-        const fntRegular  = pure.registerFont(path.join(this.dirname, "..", "fonts", "OpenSans-Regular.ttf"),"OpenSans-Regular");
-        const fntRegular2 = pure.registerFont(path.join(this.dirname, "..", "fonts", "alata-regular.ttf"),"alata-regular");
+        // When used as an npm package, fonts need to be installed in the top level of the main project
+        const fntBold     = pure.registerFont(path.join(".", "fonts", "OpenSans-Bold.ttf"),"OpenSans-Bold");
+        const fntRegular  = pure.registerFont(path.join(".", "fonts", "OpenSans-Regular.ttf"),"OpenSans-Regular");
+        const fntRegular2 = pure.registerFont(path.join(".", "fonts", "alata-regular.ttf"),"alata-regular");
         
         fntBold.loadSync();
         fntRegular.loadSync();
