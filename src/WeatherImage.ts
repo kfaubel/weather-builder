@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { LoggerInterface } from "./Logger";
 import jpeg from "jpeg-js";
 import * as pure from "pureimage";
@@ -13,7 +14,6 @@ export interface WeatherLocation {
 }
 
 export interface ImageResult {
-    expires: string;
     imageType: string;
     imageData: jpeg.BufferRet | null;
 }
@@ -25,18 +25,35 @@ export class WeatherImage {
     constructor(logger: LoggerInterface) {
         this.logger = logger;
     }
+
+    // This optimized fillRect was derived from the pureimage source code: https://github.com/joshmarinacci/node-pureimage/tree/master/src
+    // To fill a 1920x1080 image on a core i5, this saves about 1.5 seconds
+    // x, y       - position of the rect
+    // w, h       - size of the rect
+    // iw         - width of the image being written into, needed to calculate index into the buffer
+    // r, g, b, a - values to draw
+    private myFillRect(image: Buffer, x: number, y: number, w: number, h: number, iw: number, r: number, g: number, b: number, a: number) {
+        for(let i = y; i < y + h; i++) {                
+            for(let j = x; j < x + w; j++) {   
+                const index = (i * iw + j) * 4;     
+                image[index + 0] = r; 
+                image[index + 1] = g; 
+                image[index + 2] = b; 
+                image[index + 3] = a; 
+            }
+        }
+    }
     
     public async getImage(weatherLocation: WeatherLocation): Promise<ImageResult> {
         this.logger.info(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
-
         const result: boolean = await  this.weatherData.getWeatherData(weatherLocation);
 
         if (!result) {
             // tslint:disable-next-line:no-console
             this.logger.warn("Failed to get data, no image available.\n");
-            return {expires: "", imageType: "", imageData: null};
+            return {imageType: "", imageData: null};
         }
         
         const wData = this.weatherData;
@@ -117,8 +134,10 @@ export class WeatherImage {
 
 
         // Fill the bitmap
-        ctx.fillStyle = backgroundColor;
-        ctx.fillRect(0, 0, imageWidth, imageHeight);
+        //ctx.fillStyle = backgroundColor;
+        //ctx.fillRect(0, 0, imageWidth, imageHeight);
+
+        this.myFillRect(img.data, 0, 0, imageWidth, imageHeight, imageWidth, 0, 0, 0x20, 0);
 
         // Draw the title
         ctx.fillStyle = titleColor;
@@ -156,84 +175,50 @@ export class WeatherImage {
         
         // Draw the cloud cover in the background (filled)
         ctx.fillStyle = "rgb(50, 50, 50)";
-        
-        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
-            startX = chartOriginX + (i + firstHour) * pointsPerHour;
-            endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
-            startY = chartOriginY - wData.cloudCover(i) * pointsPerDegree;
-            endY   = chartOriginY - wData.cloudCover(i + 1) * pointsPerDegree;
-
-            ctx.beginPath();
-            ctx.moveTo(startX, chartOriginY);          // Start at bottom left
-            ctx.lineTo(startX, startY);     // Up to the height of startY
-            ctx.lineTo(endX, endY);         // across the top to endY       
-            ctx.lineTo(endX, chartOriginY);            // down to the bottom right
-            ctx.lineTo(startX, chartOriginY);          // back to the bottom left
-            ctx.fill();
-        }
-
-        startX = chartOriginX + (hoursToShow -1) * pointsPerHour;
-        endX   = chartOriginX + (hoursToShow) * pointsPerHour;
-        startY = chartOriginY - wData.cloudCover(hoursToShow - 1) * pointsPerDegree;
-        endY   = chartOriginY - wData.cloudCover(hoursToShow) * pointsPerDegree;
-
+        let nextX = 0;
+        let nextY = 0;
         ctx.beginPath();
-        ctx.moveTo(startX, chartOriginY);          // Start at bottom left
-        ctx.lineTo(startX, startY);     // Up to the height of startY
-        ctx.lineTo(endX, endY);         // across the top to endY       
-        ctx.lineTo(endX, chartOriginY);            // down to the bottom right
-        ctx.lineTo(startX, chartOriginY);          // back to the bottom left
+        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          // Start at baseline 
+        for (let i = 0; i < (hoursToShow - firstHour); i++) {
+            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
+            nextY = chartOriginY - wData.cloudCover(i) * pointsPerDegree;            
+            ctx.lineTo(nextX, nextY);    
+        }
+        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
+        ctx.lineTo(chartOriginX + chartWidth, nextY);
+        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);            
+        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);  
         ctx.fill();
 
         // Draw the probability of precipitation at the bottom.  The rain amount will cover part of this up.
         ctx.fillStyle = "rgb(40, 60, 100)";  // A little more blue
-
-        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
-            startX = chartOriginX + (i + firstHour) * pointsPerHour;
-            endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
-            startY = chartOriginY - wData.precipProb(i)  * pointsPerDegree;
-            endY = chartOriginY - wData.precipProb(i + 1)  * pointsPerDegree;
-
-            ctx.beginPath();
-            ctx.moveTo(startX, chartOriginY);          // Start at bottom left
-            ctx.lineTo(startX, startY);     // Up to the height of startY
-            ctx.lineTo(endX, endY);         // across the top to endY       
-            ctx.lineTo(endX, chartOriginY);            // down to the bottom right
-            ctx.lineTo(startX, chartOriginY);          // back to the bottom left
-            ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);           
+        for (let i = 0; i < (hoursToShow - firstHour); i++) {
+            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
+            nextY = chartOriginY - wData.precipProb(i) * pointsPerDegree;            
+            ctx.lineTo(nextX, nextY);     
         }
+        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
+        ctx.lineTo(chartOriginX + chartWidth, nextY);
+        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);                         
+        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          
+        ctx.fill();
 
         // Draw the rain amount in the background over the clouds (filled)
-        ctx.fillStyle = "rgb(40, 130, 150)";  // A little more blue        
-
-        for (let i = 0; i < (hoursToShow - firstHour - 1); i++) {
-            startX = chartOriginX + (i + firstHour) * pointsPerHour;
-            endX   = chartOriginX + (i + firstHour + 1) * pointsPerHour;
-            startY = chartOriginY - Math.min(wData.precipAmt(i)   *  chartHeight/fullScaleRain, chartHeight); 
-            endY   = chartOriginY - Math.min(wData.precipAmt(i+1)  * chartHeight/fullScaleRain, chartHeight);
-            //this.logger.info(`Rain at ${i} = ${wData.precipAmt(i)}`);
-
-            ctx.beginPath();
-            ctx.moveTo(startX, chartOriginY);          // Start at bottom left
-            ctx.lineTo(startX, startY);     // Up to the height of startY
-            ctx.lineTo(endX, endY);         // across the top to endY       
-            ctx.lineTo(endX, chartOriginY);            // down to the bottom right
-            ctx.lineTo(startX, chartOriginY);          // back to the bottom left
-            ctx.fill();
-        }
-
-        // Draw the last slice
-        startX = chartOriginX + (hoursToShow -1) * pointsPerHour;
-        endX   = chartOriginX + (hoursToShow) * pointsPerHour;
-        startY = chartOriginY - Math.min(wData.precipAmt(hoursToShow - 1)  * chartHeight/fullScaleRain, chartHeight); //wData.precipAmt(hoursToShow - 1) * pointsPerInch;
-        endY   = chartOriginY - Math.min(wData.precipAmt(hoursToShow)      * chartHeight/fullScaleRain, chartHeight); //wData.precipAmt(hoursToShow) * pointsPerInch;
-
+        ctx.fillStyle = "rgb(40, 130, 150)";  // And little more blue        
         ctx.beginPath();
-        ctx.moveTo(startX, chartOriginY);          // Start at bottom left
-        ctx.lineTo(startX, startY);     // Up to the height of startY
-        ctx.lineTo(endX, endY);         // across the top to endY       
-        ctx.lineTo(endX, chartOriginY);            // down to the bottom right
-        ctx.lineTo(startX, chartOriginY);          // back to the bottom left
+        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);         
+        for (let i = 0; i < (hoursToShow - firstHour); i++) {
+            
+            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
+            nextY = chartOriginY - Math.min(wData.precipAmt(i)  * chartHeight/fullScaleRain, chartHeight);            
+            ctx.lineTo(nextX, nextY);     
+        }
+        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
+        ctx.lineTo(chartOriginX + chartWidth, nextY);
+        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);            
+        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          
         ctx.fill();
 
         // Draw the grid lines
@@ -254,7 +239,7 @@ export class WeatherImage {
                 ctx.stroke();
             }
         }
-
+        
         // Draw the regular vertical lines
         ctx.strokeStyle = gridLinesColor;
         ctx.lineWidth = regularStroke;
@@ -269,7 +254,7 @@ export class WeatherImage {
             ctx.lineTo(endX, endY);
             ctx.stroke();
         }
-
+        
         // Draw the major vertical lines
         ctx.strokeStyle = majorGridLinesColor;
         ctx.lineWidth = heavyStroke;
@@ -284,7 +269,7 @@ export class WeatherImage {
             ctx.lineTo(endX, endY);
             ctx.stroke();
         }
-
+        
         // Draw the horizontal lines
         ctx.strokeStyle = gridLinesColor;
         ctx.lineWidth = regularStroke;
@@ -299,7 +284,7 @@ export class WeatherImage {
             ctx.lineTo(endX, endY);
             ctx.stroke();
         }
-
+        
         // Draw the major horizontal lines (typically at 0 and 100)
         ctx.strokeStyle = majorGridLinesColor;
         ctx.lineWidth = heavyStroke;
@@ -314,7 +299,7 @@ export class WeatherImage {
             ctx.lineTo(endX, endY);
             ctx.stroke();
         }
-
+        
         // Draw an orange line at 75 degrees
         ctx.strokeStyle = "orange";
         startX = chartOriginX;
@@ -338,7 +323,7 @@ export class WeatherImage {
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
-
+        
         // Draw the axis labels
         ctx.font = mediumFont;
         ctx.fillStyle = "rgb(200, 200, 200)";
@@ -374,7 +359,7 @@ export class WeatherImage {
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.temperature(0) * chartHeight) / fullScaleDegrees);
         
-        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.temperature(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.temperature(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
@@ -384,7 +369,7 @@ export class WeatherImage {
         ctx.strokeStyle = dewPointColor;
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.dewPoint(0) * chartHeight) / fullScaleDegrees);
-        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.dewPoint(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.dewPoint(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);        
@@ -394,21 +379,17 @@ export class WeatherImage {
         ctx.strokeStyle = windSpeedColor;
         ctx.beginPath();
         ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.windSpeed(0) * chartHeight) / fullScaleDegrees);
-        for (let i =  0; i <= (hoursToShow - firstHour - 1); i++) {
+        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
             ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.windSpeed(i) * chartHeight) / fullScaleDegrees);
         }
         ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.windSpeed(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
         ctx.stroke();
 
-        const expires = new Date();
-        expires.setHours(expires.getHours() + 2);
-
         const jpegImg = jpeg.encode(img, 50);
         
         return {
             imageData: jpegImg,
-            imageType: "jpg", 
-            expires: expires.toUTCString()
+            imageType: "jpg"
         };
     }
 }

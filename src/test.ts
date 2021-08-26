@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { WeatherLocation } from "./WeatherImage";
 import { Logger } from "./Logger";
 import { Kache } from "./Kache";
@@ -10,7 +11,7 @@ async function run() {
     const simpleImageWriter: SimpleImageWriter = new SimpleImageWriter(logger, "images");
     const weatherBuilder: WeatherBuilder = new WeatherBuilder(logger, cache, simpleImageWriter);
 
-    const weatherLocation: WeatherLocation = {
+    const weatherLocation1: WeatherLocation = {
         name: "Onset",
         lat: "41.75",
         lon: "-70.644",
@@ -18,7 +19,23 @@ async function run() {
         days: 5
     };
    
-    const success: boolean = await weatherBuilder.CreateImages(weatherLocation);
+    const weatherLocation2: WeatherLocation = {
+        name: "Nashua",
+        lat: "42.71",
+        lon: "-71.46",
+        title: "Forecast for Nashua, NH",
+        days: 5
+    };
+    
+    const weatherLocation3: WeatherLocation = {
+        name: "Test",
+        lat: "41.71",
+        lon: "-93.8",
+        title: "Forecast for Test",
+        days: 5
+    };
+   
+    const success: boolean = await weatherBuilder.CreateImages(weatherLocation2);
 
     logger.info(`test.ts: Done: ${success ? "successfully" : "failed"}`); 
 

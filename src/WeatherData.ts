@@ -43,7 +43,12 @@ export class WeatherData {
     public cloudCover (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["cloud-amount"][0].value[index];}
     public precipProb (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["probability-of-precipitation"][0].value[index];}
     public windSpeed  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["wind-speed"][0].value[index];}
-    public precipAmt  (index: number): number {return this.weatherJson.dwml.data[0].parameters[0]["hourly-qpf"][0].value[index];}
+
+    // precipAmt may return an XML nil which means no rain and does not convert to a value.  Return 0 in that case.
+    public precipAmt  (index: number): number {
+        const qpf = this.weatherJson.dwml.data[0].parameters[0]["hourly-qpf"][0].value[index];
+        return (typeof qpf === "string") ? +qpf : 0;
+    }
 
     public async getWeatherData(config: WeatherLocation): Promise<boolean> {
         if (config.lat === undefined || config.lon === undefined) {
@@ -74,7 +79,7 @@ export class WeatherData {
         this.logger.info(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
 
         try {
-            const response: AxiosResponse = await axios.get(url, {headers: {headers}});
+            const response: AxiosResponse = await axios.get(url, {headers: {headers}, timeout: 10000});
             
             const parser = new xml2js.Parser(/* options */);
             this.weatherJson = await parser.parseStringPromise(response.data);
