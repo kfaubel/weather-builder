@@ -2,7 +2,7 @@
 import xml2js from "xml2js";
 import axios, { AxiosResponse } from "axios";
 import { LoggerInterface } from "./Logger";
-import { WeatherLocation } from "./WeatherImage";
+import { WeatherLocation } from "./WeatherBuilder";
 
 // Onset" https://forecast.weather.gov/MapClick.php?lat=41.7476&lon=-70.6676&FcstType=digitalDWML
 // NOLA   https://forecast.weather.gov/MapClick.php?lat=29.9537&lon=-90.0777&FcstType=digitalDWML

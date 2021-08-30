@@ -3,7 +3,16 @@
 import { LoggerInterface } from "./Logger";
 import { KacheInterface } from "./Kache";
 import { ImageWriterInterface } from "./SimpleImageWriter";
-import { WeatherImage, WeatherLocation } from "./WeatherImage";
+import { WeatherImage } from "./WeatherImage";
+
+export interface WeatherLocation {
+    name: string;
+    lat: string;
+    lon: string;
+    title: string;
+    timeZone: string;
+    days: number;
+}
 
 export class WeatherBuilder {
     private logger: LoggerInterface;

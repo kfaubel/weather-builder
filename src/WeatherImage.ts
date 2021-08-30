@@ -4,14 +4,7 @@ import jpeg from "jpeg-js";
 import * as pure from "pureimage";
 import { WeatherData } from "./WeatherData";
 import path = require("path");
-
-export interface WeatherLocation {
-    name: string;
-    lat: string;
-    lon: string;
-    title: string;
-    days: number;
-}
+import { WeatherLocation } from "./WeatherBuilder";
 
 export interface ImageResult {
     imageType: string;
@@ -171,7 +164,18 @@ export class WeatherImage {
         //
         // We need to skip past the time that has past today.  Start at current hour
         // We do start plotting the data firstHour * pointsPerHour after the y axis
-        const firstHour: number = new Date().getHours(); // 0-23
+        //
+        // We also need the hour for the local timezone
+        // Draw the line at the current time
+        const now = new Date();
+
+        // The Cape Code Canal is always in the ET timezone
+        // "8/30/2021, 9:51:35 AM"
+        // Split on space, take the second element, split on ':'
+        const localTimeStrArray = now.toLocaleString("en-US", { timeZone: "America/New_York"}).split(" ")[1].split(":");
+        
+        const firstHour: number = +localTimeStrArray[0]; // 0-23
+        this.logger.log(`getImage: firstHour: ${firstHour}`);
         
         // Draw the cloud cover in the background (filled)
         ctx.fillStyle = "rgb(50, 50, 50)";

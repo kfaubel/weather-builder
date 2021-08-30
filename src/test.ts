@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { WeatherLocation } from "./WeatherImage";
+import { WeatherLocation } from "./WeatherBuilder";
 import { Logger } from "./Logger";
 import { Kache } from "./Kache";
 import { SimpleImageWriter } from "./SimpleImageWriter";
@@ -16,6 +16,7 @@ async function run() {
         lat: "41.75",
         lon: "-70.644",
         title: "Forecast for Onset, MA",
+        timeZone: "America/New_York",
         days: 5
     };
    
@@ -24,6 +25,7 @@ async function run() {
         lat: "42.71",
         lon: "-71.46",
         title: "Forecast for Nashua, NH",
+        timeZone: "America/New_York",
         days: 5
     };
     
@@ -32,6 +34,7 @@ async function run() {
         lat: "41.71",
         lon: "-93.8",
         title: "Forecast for Test",
+        timeZone: "America/New_York",
         days: 5
     };
    
