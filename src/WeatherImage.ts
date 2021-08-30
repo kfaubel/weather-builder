@@ -172,7 +172,7 @@ export class WeatherImage {
         // The Cape Code Canal is always in the ET timezone
         // "8/30/2021, 9:51:35 AM"
         // Split on space, take the second element, split on ':'
-        const localTimeStrArray = now.toLocaleString("en-US", { timeZone: "America/New_York"}).split(" ")[1].split(":");
+        const localTimeStrArray = now.toLocaleString("en-GB", { timeZone: "America/New_York"}).split(" ")[1].split(":");
         
         const firstHour: number = +localTimeStrArray[0]; // 0-23
         this.logger.log(`getImage: firstHour: ${firstHour}`);
