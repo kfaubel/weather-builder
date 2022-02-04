@@ -38,7 +38,7 @@ export class WeatherImage {
     }
     
     public async getImage(weatherLocation: WeatherLocation): Promise<ImageResult> {
-        this.logger.info(`WeatherImage: request for ${weatherLocation.name}`);
+        this.logger.verbose(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
         const result: boolean = await  this.weatherData.getWeatherData(weatherLocation);
@@ -175,7 +175,6 @@ export class WeatherImage {
         const localTimeStrArray = now.toLocaleString("en-GB", { timeZone: "America/New_York"}).split(" ")[1].split(":");
         
         const firstHour: number = +localTimeStrArray[0]; // 0-23
-        this.logger.log(`getImage: firstHour: ${firstHour}`);
         
         // Draw the cloud cover in the background (filled)
         ctx.fillStyle = "rgb(50, 50, 50)";

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import xml2js from "xml2js";
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import { LoggerInterface } from "./Logger";
 import { WeatherLocation } from "./WeatherBuilder";
 
@@ -14,6 +14,7 @@ export class WeatherData {
     private lat = "";
     private lon = "";
     private weatherJson: any = null; 
+    private weatherXML: string | null = null;
 
     private logger: LoggerInterface;
 
@@ -51,6 +52,8 @@ export class WeatherData {
     }
 
     public async getWeatherData(config: WeatherLocation): Promise<boolean> {
+        this.weatherJson = null;
+
         if (config.lat === undefined || config.lon === undefined) {
             this.logger.error("No lat/lon provided.");
             return false;
@@ -64,27 +67,36 @@ export class WeatherData {
         this.lon = config.lon;
 
         const url = `https://forecast.weather.gov/MapClick.php?lat=${config.lat}&lon=${config.lon}&FcstType=digitalDWML`;
-        let NWS_USER_AGENT: string | undefined = process.env.NWS_USER_AGENT;
 
-        if (NWS_USER_AGENT === undefined) {
-            this.logger.warn("WeatherData: NWS_USER_AGENT is not defined in the env, should be an email address");
-        } else {
-            NWS_USER_AGENT = "test@test.com";
+        const options: AxiosRequestConfig = {
+            headers: {
+                "Content-Encoding": "gzip",
+                "User-Agent": config.userAgent, 
+                "Feature-Flags": ""
+            },
+            timeout: 2000
+        };
+        
+        this.logger.verbose(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
+
+        await axios.get(url, options)
+            .then(async (res: AxiosResponse) => {
+                this.weatherXML = res.data;
+            })
+            .catch((error: any) => {
+                this.logger.warn(`WeatherData: GET Error: ${error}`);
+                this.weatherXML = null;
+            }); 
+
+        if (this.weatherXML === null) {
+            return false;
         }
 
-        const headers = {
-            "User-agent": NWS_USER_AGENT
-        };
-
-        this.logger.info(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
-
-        try {
-            const response: AxiosResponse = await axios.get(url, {headers: {headers}, timeout: 10000});
-            
+        try {            
             const parser = new xml2js.Parser(/* options */);
-            this.weatherJson = await parser.parseStringPromise(response.data);
+            this.weatherJson = await parser.parseStringPromise(this.weatherXML);
         } catch (e) {
-            this.logger.error("XML to JSON failed: " + e);
+            this.logger.error(`WeatherData: XML to JSON failed for ${config.title}: " + ${e}`);
             return false;
         }
         

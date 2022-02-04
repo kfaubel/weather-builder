@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import dotenv from "dotenv";
 import { WeatherLocation } from "./WeatherBuilder";
 import { Logger } from "./Logger";
 import { Kache } from "./Kache";
@@ -6,10 +7,19 @@ import { SimpleImageWriter } from "./SimpleImageWriter";
 import { WeatherBuilder } from "./WeatherBuilder";
 
 async function run() {
+    dotenv.config();  // Load var from .env into the environment
+
     const logger: Logger = new Logger("weather-builder", "verbose");
     const cache: Kache = new Kache(logger, "weather-cache.json"); 
     const simpleImageWriter: SimpleImageWriter = new SimpleImageWriter(logger, "images");
     const weatherBuilder: WeatherBuilder = new WeatherBuilder(logger, cache, simpleImageWriter);
+
+    const NWS_USER_AGENT: string | undefined = process.env.NWS_USER_AGENT;
+
+    if (NWS_USER_AGENT === undefined) {
+        logger.error("WeatherData: NWS_USER_AGENT is not defined in the env (.env), should be an email address");
+        return 1;
+    } 
 
     const weatherLocation1: WeatherLocation = {
         name: "Onset",
@@ -17,7 +27,8 @@ async function run() {
         lon: "-70.644",
         title: "Forecast for Onset, MA",
         timeZone: "America/New_York",
-        days: 5
+        days: 5,
+        userAgent: NWS_USER_AGENT
     };
    
     const weatherLocation2: WeatherLocation = {
@@ -26,7 +37,8 @@ async function run() {
         lon: "-71.46",
         title: "Forecast for Nashua, NH",
         timeZone: "America/New_York",
-        days: 5
+        days: 5,
+        userAgent: NWS_USER_AGENT
     };
     
     const weatherLocation3: WeatherLocation = {
@@ -35,7 +47,8 @@ async function run() {
         lon: "-93.8",
         title: "Forecast for Test",
         timeZone: "America/New_York",
-        days: 5
+        days: 5,
+        userAgent: NWS_USER_AGENT
     };
    
     const success: boolean = await weatherBuilder.CreateImages(weatherLocation2);

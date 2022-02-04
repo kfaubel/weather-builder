@@ -12,6 +12,7 @@ export interface WeatherLocation {
     title: string;
     timeZone: string;
     days: number;
+    userAgent: string;
 }
 
 export class WeatherBuilder {
@@ -27,16 +28,17 @@ export class WeatherBuilder {
 
     public async CreateImages(weatherLocation: WeatherLocation): Promise<boolean>{
         try {
+            const fileName = `${weatherLocation.name}.jpg`;
+
             const weatherImage: WeatherImage = new WeatherImage(this.logger);
 
             const result = await weatherImage.getImage(weatherLocation);
 
-            if (result !== null && result.imageData !== null ) {
-                const fileName = `${weatherLocation.name}.jpg`;
+            if (result !== null && result.imageData !== null ) {                
                 this.logger.info(`CreateImages: Writing: ${fileName}`);
                 this.writer.saveFile(fileName, result.imageData.data);
             } else {
-                this.logger.error("CreateImages: No imageData returned from weatherImage.getImage");
+                this.logger.warn(`CreateImages: No image for ${fileName}`);
                 return false;
             }
         } catch (e) {
