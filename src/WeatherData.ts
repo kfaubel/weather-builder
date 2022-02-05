@@ -51,7 +51,7 @@ export class WeatherData {
         return (typeof qpf === "string") ? +qpf : 0;
     }
 
-    public async getWeatherData(config: WeatherLocation): Promise<boolean> {
+    public async getWeatherData(config: WeatherLocation, userAgent: string): Promise<boolean> {
         this.weatherJson = null;
 
         if (config.lat === undefined || config.lon === undefined) {
@@ -71,7 +71,7 @@ export class WeatherData {
         const options: AxiosRequestConfig = {
             headers: {
                 "Content-Encoding": "gzip",
-                "User-Agent": config.userAgent, 
+                "User-Agent": userAgent, 
                 "Feature-Flags": ""
             },
             timeout: 2000

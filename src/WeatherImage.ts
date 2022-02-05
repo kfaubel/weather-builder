@@ -37,11 +37,11 @@ export class WeatherImage {
         }
     }
     
-    public async getImage(weatherLocation: WeatherLocation): Promise<ImageResult> {
+    public async getImage(weatherLocation: WeatherLocation, userAgent: string): Promise<ImageResult> {
         this.logger.verbose(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
-        const result: boolean = await  this.weatherData.getWeatherData(weatherLocation);
+        const result: boolean = await  this.weatherData.getWeatherData(weatherLocation, userAgent);
 
         if (!result) {
             // tslint:disable-next-line:no-console

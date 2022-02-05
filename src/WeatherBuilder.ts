@@ -12,7 +12,6 @@ export interface WeatherLocation {
     title: string;
     timeZone: string;
     days: number;
-    userAgent: string;
 }
 
 export class WeatherBuilder {
@@ -26,13 +25,13 @@ export class WeatherBuilder {
         this.writer = writer;
     }
 
-    public async CreateImages(weatherLocation: WeatherLocation): Promise<boolean>{
+    public async CreateImages(weatherLocation: WeatherLocation, userAgent: string): Promise<boolean>{
         try {
             const fileName = `${weatherLocation.name}.jpg`;
 
             const weatherImage: WeatherImage = new WeatherImage(this.logger);
 
-            const result = await weatherImage.getImage(weatherLocation);
+            const result = await weatherImage.getImage(weatherLocation, userAgent);
 
             if (result !== null && result.imageData !== null ) {                
                 this.logger.info(`CreateImages: Writing: ${fileName}`);

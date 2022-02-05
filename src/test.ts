@@ -14,10 +14,10 @@ async function run() {
     const simpleImageWriter: SimpleImageWriter = new SimpleImageWriter(logger, "images");
     const weatherBuilder: WeatherBuilder = new WeatherBuilder(logger, cache, simpleImageWriter);
 
-    const NWS_USER_AGENT: string | undefined = process.env.NWS_USER_AGENT;
+    const USER_AGENT: string | undefined = process.env.USER_AGENT;
 
-    if (NWS_USER_AGENT === undefined) {
-        logger.error("WeatherData: NWS_USER_AGENT is not defined in the env (.env), should be an email address");
+    if (USER_AGENT === undefined) {
+        logger.error("WeatherData: USER_AGENT is not defined in the env (.env), should be an email address");
         return 1;
     } 
 
@@ -27,8 +27,7 @@ async function run() {
         lon: "-70.644",
         title: "Forecast for Onset, MA",
         timeZone: "America/New_York",
-        days: 5,
-        userAgent: NWS_USER_AGENT
+        days: 5
     };
    
     const weatherLocation2: WeatherLocation = {
@@ -37,8 +36,7 @@ async function run() {
         lon: "-71.46",
         title: "Forecast for Nashua, NH",
         timeZone: "America/New_York",
-        days: 5,
-        userAgent: NWS_USER_AGENT
+        days: 5
     };
     
     const weatherLocation3: WeatherLocation = {
@@ -47,11 +45,10 @@ async function run() {
         lon: "-93.8",
         title: "Forecast for Test",
         timeZone: "America/New_York",
-        days: 5,
-        userAgent: NWS_USER_AGENT
+        days: 5
     };
    
-    const success: boolean = await weatherBuilder.CreateImages(weatherLocation2);
+    const success: boolean = await weatherBuilder.CreateImages(weatherLocation2, USER_AGENT);
 
     logger.info(`test.ts: Done: ${success ? "successfully" : "failed"}`); 
 

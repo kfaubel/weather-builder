@@ -26,6 +26,6 @@ export interface ImageWriterInterface {
 }
 
 export declare class WeatherBuilder {
-    constructor(logger: LoggerInterface, cache: KacheInterface, writer: ImageWriterInterface): void;
-    CreateImages(weatherLocation: WeatherLocation): Promise<boolean>
+    constructor(logger: LoggerInterface, cache: KacheInterface, writer: ImageWriterInterface);
+    CreateImages(weatherLocation: WeatherLocation, userAgent: string): Promise<boolean>
 }
