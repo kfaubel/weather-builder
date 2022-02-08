@@ -74,14 +74,17 @@ export class WeatherData {
                 "User-Agent": userAgent, 
                 "Feature-Flags": ""
             },
-            timeout: 2000
+            timeout: 20000
         };
         
         this.logger.verbose(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
 
+        const startTime = new Date();
         await axios.get(url, options)
             .then(async (res: AxiosResponse) => {
                 this.weatherXML = res.data;
+                const endTime = new Date();
+                this.logger.info(`WeatherData: GET TIME: ${endTime.getTime() - startTime.getTime()}ms`);
             })
             .catch((error: any) => {
                 this.logger.warn(`WeatherData: GET Error: ${error}`);
