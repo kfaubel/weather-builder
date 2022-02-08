@@ -6,10 +6,10 @@ import { WeatherData } from "./WeatherData";
 import path = require("path");
 import { WeatherLocation } from "./WeatherBuilder";
 
-export interface ImageResult {
-    imageType: string;
-    imageData: jpeg.BufferRet | null;
-}
+// export interface ImageResult {
+//     imageType: string;
+//     imageData: jpeg.BufferRet | null;
+// }
 
 export class WeatherImage {
     private weatherData?: WeatherData;
@@ -37,16 +37,14 @@ export class WeatherImage {
         }
     }
     
-    public async getImage(weatherLocation: WeatherLocation, userAgent: string): Promise<ImageResult> {
+    public async getImage(weatherLocation: WeatherLocation, userAgent: string): Promise<Buffer | null> {
         this.logger.verbose(`WeatherImage: request for ${weatherLocation.name}`);
         
         this.weatherData = new WeatherData(this.logger);
         const result: boolean = await  this.weatherData.getWeatherData(weatherLocation, userAgent);
 
         if (!result) {
-            // tslint:disable-next-line:no-console
-            this.logger.warn("Failed to get data, no image available.\n");
-            return {imageType: "", imageData: null};
+            return null;
         }
         
         const wData = this.weatherData;
@@ -390,9 +388,6 @@ export class WeatherImage {
 
         const jpegImg = jpeg.encode(img, 50);
         
-        return {
-            imageData: jpegImg,
-            imageType: "jpg"
-        };
+        return jpegImg.data;
     }
 }

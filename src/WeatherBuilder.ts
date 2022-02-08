@@ -33,15 +33,15 @@ export class WeatherBuilder {
 
             const result = await weatherImage.getImage(weatherLocation, userAgent);
 
-            if (result !== null && result.imageData !== null ) {                
-                this.logger.info(`CreateImages: Writing: ${fileName}`);
-                this.writer.saveFile(fileName, result.imageData.data);
+            if (result !== null) {                
+                this.logger.info(`WeatherBuilder: Writing: ${fileName}`);
+                this.writer.saveFile(fileName, result);
             } else {
-                this.logger.warn(`CreateImages: No image for ${fileName}`);
+                this.logger.warn(`WeatherBuilder: No image for ${fileName}`);
                 return false;
             }
         } catch (e) {
-            this.logger.error(`CreateImages: Exception: ${e}`);
+            this.logger.error(`WeatherBuilder: Exception: ${e}`);
             return false;
         }
 
