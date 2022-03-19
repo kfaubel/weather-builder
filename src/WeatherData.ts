@@ -22,7 +22,7 @@ export class WeatherData {
         this.logger = logger;
     }    
 
-    // time                     "2019-07-08T17:00:00-04:00" 
+    // time                     "2019-07-08T17:00:00-04:00" - Time is in the local timzeone for the lat/lon location
     // hourly temp              "72"                        
     // dew point                "58"                        
     // heat index               "72"                        
@@ -77,7 +77,8 @@ export class WeatherData {
             timeout: 20000
         };
         
-        this.logger.verbose(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title}`);
+        this.logger.verbose(`WeatherData: Getting for: ${config.name} lat=${config.lat}, lon=${config.lon}, Title: ${config.title} Agent: ${userAgent}`);
+        this.logger.verbose(`${url}`);
 
         const startTime = new Date();
         await axios.get(url, options)

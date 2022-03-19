@@ -167,12 +167,19 @@ export class WeatherImage {
         // Draw the line at the current time
         const now = new Date();
 
-        // The Cape Code Canal is always in the ET timezone
-        // "8/30/2021, 9:51:35 AM"
-        // Split on space, take the second element, split on ':'
-        const localTimeStrArray = now.toLocaleString("en-GB", { timeZone: "America/New_York"}).split(" ")[1].split(":");
+        // The weather date is always in the timezone of the lat/lon
+        // 2022-03-18T04:00:00-06:00 - Denver
+        // Split on "T"", take the second element, split on ':', take the first element
+        const firstHour: number = +wData.timeString(0).split("T")[1].split(":")[0];
+        this.logger.verbose(`WeatherImage: First hour: ${firstHour}`);
         
-        const firstHour: number = +localTimeStrArray[0]; // 0-23
+        // OLD
+        // localTimeStrArray = ["9", "51", "35"]
+        // const localTimeStrArray = now.toLocaleString("en-GB", { timeZone: "America/New_York"}).split(" ")[1].split(":");
+        // const localTimeStrArray = now.toLocaleString().split(" ")[1].split(":");
+        // const firstHour: number = +localTimeStrArray[0]; // 0-23
+        // Split on "T"", take the second element, split on ':', take the first element
+        //const firstHour: number = +timeStrArray[0]; // 0-23
         
         // Draw the cloud cover in the background (filled)
         ctx.fillStyle = "rgb(50, 50, 50)";
@@ -340,17 +347,26 @@ export class WeatherImage {
         }       
 
         const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        // The weather date is always in the timezone of the lat/lon
+        // 2022-03-18T04:00:00-06:00 - Denver
+        // If we create the Date from this ISO-8601 string, getDay() is always relative to the timezone specified (e.g. -06:00)
 
+        const firstDate = new Date(wData.timeString(0));
+        
+        let labelDayIndex = firstDate.getDay();
+
+        this.logger.verbose(`WeatherImage: First day: ${wData.timeString(0)}  ${labelDayIndex}  ${weekday[labelDayIndex]}`);
         for (let i = 0; i < (hoursToShow / 24); i++) {
-            const date = new Date(Date.parse(wData.timeString(i * 24)));
-            const dayStr: string = weekday[date.getDay()];
+            const dayStr: string = weekday[labelDayIndex];
             const dayStrWdth: number = ctx.measureText(dayStr).width;
-
 
             const x: number = chartOriginX + (i * 4 + 2) * verticalGridSpacing;
             const y: number = chartOriginY + 40;
 
             ctx.fillText(dayStr, x - dayStrWdth / 2, y);
+            labelDayIndex++;
+            if (labelDayIndex > 6)
+                labelDayIndex = 0;
         }
 
         ctx.lineWidth = heavyStroke;

@@ -40,15 +40,15 @@ async function run() {
     };
     
     const weatherLocation3: WeatherLocation = {
-        name: "Test",
-        lat: "41.71",
-        lon: "-93.8",
-        title: "Forecast for Test",
+        name: "Boulder",
+        lat: "40.01",
+        lon: "-105.27",
+        title: "Forecast for Boulder",
         timeZone: "America/New_York",
         days: 5
     };
    
-    const success: boolean = await weatherBuilder.CreateImages(weatherLocation2, USER_AGENT);
+    const success: boolean = await weatherBuilder.CreateImages(weatherLocation3, USER_AGENT);
 
     logger.info(`test.ts: Done: ${success ? "successfully" : "failed"}`); 
 
