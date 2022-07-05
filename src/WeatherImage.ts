@@ -5,6 +5,7 @@ import * as pure from "pureimage";
 import { WeatherData } from "./WeatherData";
 import path = require("path");
 import { WeatherLocation } from "./WeatherBuilder";
+import moment from "moment-timezone";  // https://momentjs.com/timezone/docs/ &  https://momentjs.com/docs/
 
 // export interface ImageResult {
 //     imageType: string;
@@ -349,11 +350,12 @@ export class WeatherImage {
         const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
         // The weather date is always in the timezone of the lat/lon
         // 2022-03-18T04:00:00-06:00 - Denver
-        // If we create the Date from this ISO-8601 string, getDay() is always relative to the timezone specified (e.g. -06:00)
+        // If we just parse this with Date we get a GMT date and the label will be wrong when the GMT day does not match the lcoal day
+        // We use moment to correct this since it lets us specify the tz for the created moment
 
-        const firstDate = new Date(wData.timeString(0));
+        const firstMoment = moment(wData.timeString(0)).tz(weatherLocation.timeZone);
         
-        let labelDayIndex = firstDate.getDay();
+        let labelDayIndex = firstMoment.day();
 
         this.logger.verbose(`WeatherImage: First day: ${wData.timeString(0)}  ${labelDayIndex}  ${weekday[labelDayIndex]}`);
         for (let i = 0; i < (hoursToShow / 24); i++) {
