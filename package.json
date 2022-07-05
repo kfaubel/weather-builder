@@ -1,6 +1,6 @@
 {
   "name": "weather-builder",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Create images with data from the NWS",
   "main": "index.js",
   "types": "index.d.ts",
