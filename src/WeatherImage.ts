@@ -37,6 +37,9 @@ export class WeatherImage {
             }
         }
     }
+
+    //private drawGridLines(ctx: pure.Context2D, chartOriginX: number, chartOriginY: number, chartWidth: number, chartHeight: number, verticalFineGridSpacing: number, verticalGridSpacing: number, verticalMajorGridSpacing: number, horizontalGridSpacing: number, showHourGridLines: boolean) {
+        
     
     public async getImage(weatherLocation: WeatherLocation, userAgent: string): Promise<Buffer | null> {
         this.logger.verbose(`WeatherImage: request for ${weatherLocation.name}`);

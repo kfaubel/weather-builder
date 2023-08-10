@@ -54,7 +54,7 @@ export class Kache implements KacheInterface {
 
     public get(key: string): unknown {
         if (this.cacheStorage[key] !== undefined) {
-            const cacheItem: KacheItem = this.cacheStorage[key as keyof CacheStorage];
+            const cacheItem: KacheItem = this.cacheStorage[key as keyof KacheStorage];
 
             const expiration: number = cacheItem.expiration;
             const item: unknown    = cacheItem.item;
@@ -80,7 +80,7 @@ export class Kache implements KacheInterface {
         this.logger.verbose(`Cache set: Key: ${key}, exp: ${comment}`);
 
         const cacheItem = {expiration: expirationTime, comment: comment, item: newItem};
-        this.cacheStorage[key as keyof CacheStorage] =  cacheItem;
+        this.cacheStorage[key as keyof KacheStorage] =  cacheItem;
 
         // Does this need to be synchronous?
         fs.writeFileSync(this.cachePath, JSON.stringify(this.cacheStorage, null, 4));
