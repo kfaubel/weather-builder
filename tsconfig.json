@@ -29,7 +29,7 @@
   "include": [
       "src/**/*.ts",
       "tests/**/*.ts"
-  ],
+, "src/WeatherData.ts.copy"  ],
   "exclude": [
       "node_modules"
   ]

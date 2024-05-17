@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { LoggerInterface } from "./Logger";
 import jpeg from "jpeg-js";
 import * as pure from "pureimage";
-import { WeatherData } from "./WeatherData";
+import { WeatherData, WeatherDatasetInterface, DataPoint} from "./WeatherData";
 import path = require("path");
 import { WeatherLocation } from "./WeatherBuilder";
 import moment from "moment-timezone";  // https://momentjs.com/timezone/docs/ &  https://momentjs.com/docs/
@@ -15,17 +16,84 @@ import moment from "moment-timezone";  // https://momentjs.com/timezone/docs/ & 
 export class WeatherImage {
     private weatherData?: WeatherData;
     private logger: LoggerInterface;
+    private imageHeight: number;
+    private imageWidth: number;
+    private chartOriginX: number;
+    private chartOriginY: number;
+    private chartWidth: number;
+    private chartHeight: number;
+    private daysToShow: number;
+    private topLegendLeftIndent: number;
+    //private showHourGridLines: boolean;
+    private hoursToShow: number;
+    //private verticalFineGridLines: number;
+    private verticalGridLines: number;
+    private verticalMajorGridLines: number;
+    //private verticalFineGridSpacing: number;
+    private verticalGridSpacing: number;
+    private verticalMajorGridSpacing: number;
+    private pointsPerHour: number;
+    private fullScaleDegrees: number;
+    private horizontalGridLines: number;
+    private horizontalGridSpacing: number;
+    private pointsPerDegree: number;
+    private fullScaleRain: number;
 
     constructor(logger: LoggerInterface) {
         this.logger = logger;
+        this.imageHeight = 1080; 
+        this.imageWidth  = 1920; 
+
+        // Screen origin is the upper left corner
+        this.chartOriginX = 100;                                                         // In from the left edge
+        this.chartOriginY = this.imageHeight - 70;                                       // Down from the top (Was: Up from the bottom edge)
+
+        this.topLegendLeftIndent = this.imageWidth - 300;
+
+        this.chartWidth = 1680;                                                          // Smaller than the imageWidth but must be a multiple of hoursToShow
+        this.chartHeight = 900;                                                          // Smaller than the imageHeight but must be a multiple of 100
+
+        this.daysToShow = 5;                                                             // for 5 days (valid is 1..6)
+        
+        //this.showHourGridLines = this.daysToShow <= 2 ? true : false;                    // Only show if we are showing 2 days or less, otherwise its too crowded
+
+        this.hoursToShow = this.daysToShow * 24;                                         //   120
+
+        //this.verticalFineGridLines = this.daysToShow * 24;                               //   120        every 1 hours  (0-20 for 21 total vertical lines)
+        this.verticalGridLines = this.daysToShow * 4;                                    //   20        every 6 hours  (0-20 for 21 total vertical lines)
+        this.verticalMajorGridLines = this.daysToShow;                                   //   4         every 4th vertical lines is a day 
+
+        //this.verticalFineGridSpacing = this.chartWidth / this.verticalFineGridLines;     // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
+        this.verticalGridSpacing = this.chartWidth / this.verticalGridLines;             // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
+        this.verticalMajorGridSpacing = this.chartWidth / this.verticalMajorGridLines;   // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
+
+        this.pointsPerHour = this.chartWidth / this.hoursToShow;
+
+        this.fullScaleDegrees = 100;
+        this.horizontalGridLines = this.fullScaleDegrees/10;                             // The full scale is devided into a grid of 10. Each represents 10 degrees, percent or miles per hour
+        this.horizontalGridSpacing = this.chartHeight / this.horizontalGridLines;        // vertical spacing between the horizontal lines. 900 pixels split into 10 chunks
+        this.pointsPerDegree = this.chartHeight/100;                                     // vertical pixels per degree temp
+
+        this.fullScaleRain = 0.64;                                                       //  Slight rain:      trace        - 0.02 in/hour
+        //  Moderate rain:    0.02 in/hour - 0.08 in/hour
+        //  Heavy rain:       0.08 in/hour - 0.32 in/hour <== this should be our midpoint
+        //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
     }
 
-    // This optimized fillRect was derived from the pureimage source code: https://github.com/joshmarinacci/node-pureimage/tree/master/src
-    // To fill a 1920x1080 image on a core i5, this saves about 1.5 seconds
-    // x, y       - position of the rect
-    // w, h       - size of the rect
-    // iw         - width of the image being written into, needed to calculate index into the buffer
-    // r, g, b, a - values to draw
+    /**
+     * myFillRect() - Optimized fillRect for pureimage
+     * This optimized fillRect was derived from the pureimage source code: https://github.com/joshmarinacci/node-pureimage/tree/master/src
+     * @param image 
+     * @param x   - position of the rect
+     * @param y   - position of the rect
+     * @param w   - width of the rect
+     * @param h   - height of the rect
+     * @param iw  - width of the image being written into, needed to calculate index into the buffer
+     * @param r   - red
+     * @param g   - green
+     * @param b   - blue
+     * @param a   - alpha
+     */
     private myFillRect(image: Buffer, x: number, y: number, w: number, h: number, iw: number, r: number, g: number, b: number, a: number) {
         for(let i = y; i < y + h; i++) {                
             for(let j = x; j < x + w; j++) {   
@@ -38,58 +106,122 @@ export class WeatherImage {
         }
     }
 
-    //private drawGridLines(ctx: pure.Context2D, chartOriginX: number, chartOriginY: number, chartWidth: number, chartHeight: number, verticalFineGridSpacing: number, verticalGridSpacing: number, verticalMajorGridSpacing: number, horizontalGridSpacing: number, showHourGridLines: boolean) {
+    /**
+     * drawShadedArea() - Draw a shaded area on the chart
+     * @param ctx - Canvas context
+     * @param currentHour - The current hour to start drawing from
+     * @param wData - The weather data array to draw. 0-120 hours
+     * @param dataField - The specific element in the data array to draw ("temperature", "dewpoint", ...)
+     * @param fillStyle - The fill style (color) to use
+     * @returns nothing
+     */
+    private drawShadedArea = (ctx: any, currentHour: number, wData: DataPoint[], dataField: keyof DataPoint, fillStyle: string) => { //, chartOriginX: number, chartOriginY: number, chartWidth: number, chartHeight: number, pointsPerHour: number, wData: WeatherDatasetInterface, firstHour: number, hoursToShow: number, fullScaleDegrees: number, color: string) {
+        if (wData === undefined) {
+            return;
+        }
+        ctx.fillStyle = fillStyle;
+        let nextX = 0;
+        let nextY = 0;
+        ctx.beginPath();
+        ctx.moveTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY);          // Start at baseline 
+        ctx.lineTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY - (wData[currentHour]?.[dataField] ?? 0) * this.pointsPerDegree);  // Draw up to the first point
         
-    
-    public async getImage(weatherLocation: WeatherLocation, userAgent: string): Promise<Buffer | null> {
-        this.logger.verbose(`WeatherImage: request for ${weatherLocation.name}`);
-        
-        this.weatherData = new WeatherData(this.logger);
-        const result: boolean = await  this.weatherData.getWeatherData(weatherLocation, userAgent);
+        for (let i = currentHour + 1; i < (this.hoursToShow); i++) {
+            nextX = this.chartOriginX + i * this.pointsPerHour;
+            nextY = this.chartOriginY - (wData[i]?.[dataField] ?? 0) * this.pointsPerDegree;            
+            ctx.lineTo(nextX, nextY);    
+        }
+        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
+        ctx.lineTo(this.chartOriginX + this.chartWidth, nextY);
+        ctx.lineTo(this.chartOriginX + this.chartWidth, this.chartOriginY);            
+        ctx.lineTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY);  
+        ctx.fill();
+    };
 
+    /**
+     * plotLine() - Draw a line from the currentHour to the end (chart width)
+     * @param ctx - Canvas context
+     * @param currentHour - The current hour to start drawing from
+     * @param wData - The weather data array to draw. 0-120 hours
+     * @param dataField - The specific element in the data array to draw ("temperature", "dewpoint", ...)
+     * @param fillStyle - The fill style (color) to use
+     * @returns nothing
+     */
+    private plotLine = (ctx: any, currentHour: number, wData: DataPoint[], dataField: keyof DataPoint, color: string, width: number) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY - ((wData[currentHour]?.[dataField] ?? 0) * this.chartHeight) / this.fullScaleDegrees);
+        for (let i =  currentHour + 1; i < (this.hoursToShow); i++) {
+            ctx.lineTo(this.chartOriginX + i * this.pointsPerHour, this.chartOriginY - ((wData[i]?.[dataField] ?? 0) * this.chartHeight) / this.fullScaleDegrees);
+        }
+        // Extend the line to the end of the chart
+        ctx.lineTo(this.chartOriginX + this.chartWidth, this.chartOriginY - ((wData[this.hoursToShow]?.[dataField] ?? 0) * this.chartHeight) / this.fullScaleDegrees);
+        ctx.stroke();
+    }; 
+
+    /**
+     * drawVerticalLine Draw a vertical line on the chart
+     * @param ctx    - Canvas context
+     * @param x      - x position of the line (Relative to the chartOriginX) 
+     * @param color 
+     * @param width 
+     */
+    private drawVerticalLine = (ctx: any, x: number, color: string, width: number) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        const startX = this.chartOriginX + x;
+        const endX = this.chartOriginX + x;
+        const startY = this.chartOriginY;
+        const endY = this.chartOriginY - (this.chartHeight);
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+    };
+
+    /**
+     * drawHorizontalLine Draw a horizontal line on the chart
+     * @param ctx    - Canvas context
+     * @param y      - y position of the line (Relative to the chartOriginY) 
+     * @param color 
+     * @param width 
+     */
+    private drawHorizontalLine = (ctx: any, y: number, color: string, width: number) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        const startX = this.chartOriginX;
+        const endX = this.chartOriginX + this.chartWidth;
+        const startY = this.chartOriginY - y;
+        const endY = this.chartOriginY - y;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+    };
+    
+    /**
+     * getImage() - Create an image of the weather data
+     * @param lat - Latitude of the location
+     * @param lon - Longitude of the location
+     * @param title - Title to display on the image
+     * @param userAgent - User agent to use for the request
+     * @returns Buffer with the image data
+     */
+    public async getImage(lat: string, lon: string, title: string, userAgent: string): Promise<Buffer | null> {
+        this.logger.verbose(`WeatherImage: request for ${lat},${lon} ${title}`);
+        
+        this.weatherData = new WeatherData(this.logger, lat, lon, userAgent);
+        const result: WeatherDatasetInterface | null = await  this.weatherData.getWeatherData();
         if (!result) {
             return null;
         }
         
-        const wData = this.weatherData;
-        
-        const imageHeight = 1080; 
-        const imageWidth  = 1920; 
-
-        // Screen origin is the upper left corner
-        const  chartOriginX = 100;                                               // In from the left edge
-        const  chartOriginY = imageHeight - 70;                                  // Down from the top (Was: Up from the bottom edge)
-
-        const topLegendLeftIndent = imageWidth - 300;
-
-        const  chartWidth = 1680;                                                // Smaller than the imageWidth but must be a multiple of hoursToShow
-        const  chartHeight = 900;                                                // Smaller than the imageHeight but must be a multiple of 100
-
-        const  daysToShow = weatherLocation.days;                                         // for 5 days (valid is 1..6)
-        
-        const  showHourGridLines = daysToShow <= 2 ? true : false;               // Only show if we are showing 2 days or less, otherwise its too crowded
-
-        const  hoursToShow = daysToShow * 24;                                    //   120
-
-        const  verticalFineGridLines = daysToShow * 24;                           //   120        every 1 hours  (0-20 for 21 total vertical lines)
-        const  verticalGridLines = daysToShow * 4;                               //   20        every 6 hours  (0-20 for 21 total vertical lines)
-        const  verticalMajorGridLines = daysToShow;                              //   4         every 4th vertical lines is a day 
-
-        const  verticalFineGridSpacing = chartWidth / verticalFineGridLines;     // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
-        const  verticalGridSpacing = chartWidth / verticalGridLines;             // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
-        const  verticalMajorGridSpacing = chartWidth / verticalMajorGridLines;   // horizontal spacing between the vertical lines. 1080 pixels split into 20 chunks
-
-        const  pointsPerHour = chartWidth / hoursToShow;
-
-        const  fullScaleDegrees = 100;
-        const  horizontalGridLines = fullScaleDegrees/10;                        // The full scale is devided into a grid of 10. Each represents 10 degrees, percent or miles per hour
-        const  horizontalGridSpacing = chartHeight / horizontalGridLines;        // vertical spacing between the horizontal lines. 900 pixels split into 10 chunks
-        const  pointsPerDegree = chartHeight/100;                                // vertical pixels per degree temp
-
-        const  fullScaleRain = 0.64;                                             //  Slight rain:      trace        - 0.02 in/hour
-        //  Moderate rain:    0.02 in/hour - 0.08 in/hour
-        //  Heavy rain:       0.08 in/hour - 0.32 in/hour <== this should be our midpoint
-        //  Very heavy rain:  0.32 in/hr   - 0.64 in/hour <== this is full scale
+        // Data element 0 is midnight of the first day.  
+        // The first valid data is at result.dataPoints[firstHour]
+        // We start the plot at result.dataPoints[currentHour]
+        const wData = result.dataPoints;
+        const firstHour = result.firstHour;
         
         const largeFont  = "48px 'OpenSans-Bold'";   // Title
         const mediumFont = "36px 'OpenSans-Bold'";   // axis labels
@@ -116,9 +248,10 @@ export class WeatherImage {
         const dewPointColor       = "rgb(140, 240, 0)";
         const windSpeedColor      = "yellow";
 
-        const img = pure.make(imageWidth, imageHeight);
+        const img = pure.make(this.imageWidth, this.imageHeight);
         const ctx = img.getContext("2d");
 
+        
         // Canvas reference
         // origin is upper right
         // coordinates are x, y, width, height in that order
@@ -127,246 +260,100 @@ export class WeatherImage {
         //                 ctx.setFillColor(r, g, b, a);
         //                 ctx.strokeStyle = 'rgb(100, 100, 100)';
 
+        // Fill the bitmap - slow way
+        // ctx.fillStyle = backgroundColor;
+        // ctx.fillRect(0, 0, imageWidth, imageHeight);
 
-        // Fill the bitmap
-        //ctx.fillStyle = backgroundColor;
-        //ctx.fillRect(0, 0, imageWidth, imageHeight);
-
-        this.myFillRect(img.data, 0, 0, imageWidth, imageHeight, imageWidth, 0, 0, 0x20, 0);
+        this.myFillRect(img.data, 0, 0, this.imageWidth, this.imageHeight, this.imageWidth, 0, 0, 0x20, 0);
 
         // Draw the title
         ctx.fillStyle = titleColor;
         ctx.font = largeFont;
-        const textWidth: number = ctx.measureText(weatherLocation.title).width;
-        ctx.fillText(weatherLocation.title, (imageWidth - textWidth) / 2, 60);
+        const textWidth: number = ctx.measureText(title).width;
+        ctx.fillText(title, (this.imageWidth - textWidth) / 2, 60);
 
         // Draw the color key labels        
         ctx.font = smallFont;
 
         ctx.fillStyle = temperatureColor;
-        ctx.fillText("Temperature", topLegendLeftIndent, 30);
+        ctx.fillText("Temperature", this.topLegendLeftIndent, 30);
 
         ctx.fillStyle = dewPointColor;
-        ctx.fillText("Dew Point", topLegendLeftIndent, 60);
+        ctx.fillText("Dew Point", this.topLegendLeftIndent, 60);
 
         ctx.fillStyle = windSpeedColor;
-        ctx.fillText("Wind Speed", topLegendLeftIndent, 90);
+        ctx.fillText("Wind Speed", this.topLegendLeftIndent, 90);
 
-        let startX: number;
-        let startY: number;
-        let endX: number;
-        let endY: number;
+        const currentMoment = moment();
+        const currentHour = currentMoment.hour();
+        this.logger.verbose(`WeatherImage: First hour: ${firstHour}, Current hour: ${currentHour}`);
 
-        
-        // if there are 120 hours to show, and first hour is 0
-        // we want to access wData in the range 0-119
-        // since each iteration uses i and i+1, we want to loop from 0-118
-        //
-        // if we start 10 hours into the day, we will loop from 0-109
-        //
-        // We need to skip past the time that has past today.  Start at current hour
-        // We do start plotting the data firstHour * pointsPerHour after the y axis
-        //
-        // We also need the hour for the local timezone
-        // Draw the line at the current time
-        const now = new Date();
-
-        // The weather date is always in the timezone of the lat/lon
-        // 2022-03-18T04:00:00-06:00 - Denver
-        // Split on "T"", take the second element, split on ':', take the first element
-        const firstHour: number = +wData.timeString(0).split("T")[1].split(":")[0];
-        this.logger.verbose(`WeatherImage: First hour: ${firstHour}`);
-        
-        // OLD
-        // localTimeStrArray = ["9", "51", "35"]
-        // const localTimeStrArray = now.toLocaleString("en-GB", { timeZone: "America/New_York"}).split(" ")[1].split(":");
-        // const localTimeStrArray = now.toLocaleString().split(" ")[1].split(":");
-        // const firstHour: number = +localTimeStrArray[0]; // 0-23
-        // Split on "T"", take the second element, split on ':', take the first element
-        //const firstHour: number = +timeStrArray[0]; // 0-23
+        if (currentHour < firstHour) {
+            this.logger.verbose(`WeatherImage: Current hour ${currentHour} is before first hour ${firstHour}, aborting image creation`);
+            return null;
+        }
         
         // Draw the cloud cover in the background (filled)
-        ctx.fillStyle = "rgb(50, 50, 50)";
-        let nextX = 0;
-        let nextY = 0;
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          // Start at baseline 
-        for (let i = 0; i < (hoursToShow - firstHour); i++) {
-            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
-            nextY = chartOriginY - wData.cloudCover(i) * pointsPerDegree;            
-            ctx.lineTo(nextX, nextY);    
-        }
-        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
-        ctx.lineTo(chartOriginX + chartWidth, nextY);
-        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);            
-        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);  
-        ctx.fill();
+        this.drawShadedArea(ctx, currentHour, wData, "skyCover", "rgb(50, 50, 50)");
 
         // Draw the probability of precipitation at the bottom.  The rain amount will cover part of this up.
-        ctx.fillStyle = "rgb(40, 60, 100)";  // A little more blue
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);           
-        for (let i = 0; i < (hoursToShow - firstHour); i++) {
-            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
-            nextY = chartOriginY - wData.precipProb(i) * pointsPerDegree;            
-            ctx.lineTo(nextX, nextY);     
-        }
-        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
-        ctx.lineTo(chartOriginX + chartWidth, nextY);
-        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);                         
-        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          
-        ctx.fill();
+        this.drawShadedArea(ctx, currentHour, wData, "probabilityOfPrecipitation", "rgb(40, 60, 100)");
 
         // Draw the rain amount in the background over the clouds (filled)
-        ctx.fillStyle = "rgb(40, 130, 150)";  // And little more blue        
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);         
-        for (let i = 0; i < (hoursToShow - firstHour); i++) {
-            
-            nextX = chartOriginX + (i + firstHour) * pointsPerHour;
-            nextY = chartOriginY - Math.min(wData.precipAmt(i)  * chartHeight/fullScaleRain, chartHeight);            
-            ctx.lineTo(nextX, nextY);     
-        }
-        // Repeat the last segment to fill the chart, draw down to the baseline and back to the origin
-        ctx.lineTo(chartOriginX + chartWidth, nextY);
-        ctx.lineTo(chartOriginX + chartWidth, chartOriginY);            
-        ctx.lineTo(chartOriginX + firstHour * pointsPerHour, chartOriginY);          
-        ctx.fill();
-
-        // Draw the grid lines
-
-        // Draw the thin hour vertical lines
-        if (showHourGridLines) {
-            ctx.strokeStyle = gridLinesColor;
-            ctx.lineWidth = thinStroke;
-            for (let i = 0; i <= verticalFineGridLines; i++) {
-                startX = chartOriginX + (i * verticalFineGridSpacing);
-                endX = chartOriginX + (i * verticalFineGridSpacing);
-                startY = chartOriginY;
-                endY = chartOriginY - (chartHeight);
-
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
-            }
+        this.drawShadedArea(ctx, currentHour, wData, "quantitativePrecipitation", "rgb(40, 130, 150)");
+        
+        // Draw the minor vertical grid lines
+        for (let i = 0; i <= this.verticalGridLines; i++) {
+            this.drawVerticalLine(ctx, i * this.verticalGridSpacing, gridLinesColor, regularStroke);
         }
         
-        // Draw the regular vertical lines
-        ctx.strokeStyle = gridLinesColor;
-        ctx.lineWidth = regularStroke;
-        for (let i = 0; i <= verticalGridLines; i++) {
-            startX = chartOriginX + (i * verticalGridSpacing);
-            endX = chartOriginX + (i * verticalGridSpacing);
-            startY = chartOriginY;
-            endY = chartOriginY - (chartHeight);
-
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
+        // Draw the major vertical grid lines
+        for (let i = 0; i <= this.verticalMajorGridLines; i++) {
+            this.drawVerticalLine(ctx, i * this.verticalMajorGridSpacing, majorGridLinesColor, heavyStroke);
         }
-        
-        // Draw the major vertical lines
-        ctx.strokeStyle = majorGridLinesColor;
-        ctx.lineWidth = heavyStroke;
-        for (let i = 0; i <= verticalGridLines; i ++) {
-            startX = chartOriginX + (i * verticalMajorGridSpacing);
-            endX = chartOriginX + (i * verticalMajorGridSpacing);
-            startY = chartOriginY;
-            endY = chartOriginY - (chartHeight);
 
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
+        // Draw the minor horizontal grid lines
+        for (let i = 0; i <= this.horizontalGridLines; i++) {
+            this.drawHorizontalLine(ctx, i * this.horizontalGridSpacing, gridLinesColor, regularStroke);
         }
-        
-        // Draw the horizontal lines
-        ctx.strokeStyle = gridLinesColor;
-        ctx.lineWidth = regularStroke;
-        for (let i = 0; i <= horizontalGridLines; i++) {
-            startX = chartOriginX;
-            endX = chartOriginX + chartWidth;
-            startY = chartOriginY - (i * horizontalGridSpacing);
-            endY = chartOriginY - (i * horizontalGridSpacing);
 
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
-        }
-        
-        // Draw the major horizontal lines (typically at 0 and 100)
-        ctx.strokeStyle = majorGridLinesColor;
-        ctx.lineWidth = heavyStroke;
+        // Draw the major horizontal grid lines at 0 and 100
         for (let i = 0; i <= 1; i++) {
-            startX = chartOriginX;
-            endX   = chartOriginX + chartWidth;
-            startY = chartOriginY - (i * chartHeight);
-            endY   = chartOriginY - (i * chartHeight);
-
-            ctx.beginPath();
-            ctx.moveTo(startX, startY);
-            ctx.lineTo(endX, endY);
-            ctx.stroke();
+            this.drawHorizontalLine(ctx, i * this.chartHeight, majorGridLinesColor, heavyStroke);
         }
         
         // Draw an orange line at 75 degrees
-        ctx.strokeStyle = "orange";
-        startX = chartOriginX;
-        endX   = chartOriginX + chartWidth;
-        startY = chartOriginY - (horizontalGridSpacing * 75) / 10;
-        endY   = chartOriginY - (horizontalGridSpacing * 75) / 10;
+        this.drawHorizontalLine(ctx, (this.horizontalGridSpacing * 75) / 10, "orange", heavyStroke);
 
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        // Draw an blue line at 32 degrees
-        ctx.strokeStyle = "rgb(0, 0, 200)";
-        startX = chartOriginX;
-        endX = chartOriginX + chartWidth;
-        startY = chartOriginY - (horizontalGridSpacing * 32) / 10;
-        endY = chartOriginY - (horizontalGridSpacing * 32) / 10;
-
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+        // Draw an blue line at 32 degrees        
+        this.drawHorizontalLine(ctx, (this.horizontalGridSpacing * 32) / 10, "rgb(0, 0, 200)", heavyStroke);
         
         // Draw the axis labels
         ctx.font = mediumFont;
         ctx.fillStyle = "rgb(200, 200, 200)";
 
-        for (let i = 0; i <= horizontalGridLines; i++) {
+        for (let i = 0; i <= this.horizontalGridLines; i++) {
             // i = 0, 1 ..10    labelString = "0", "10" .. "100"
-            const labelString: string = (i * (fullScaleDegrees/horizontalGridLines)).toString(); 
+            const labelString: string = (i * (this.fullScaleDegrees/this.horizontalGridLines)).toString(); 
 
             const labelStringWdth: number = ctx.measureText(labelString).width;
-            const x: number = chartOriginX - 50;
-            const y: number = chartOriginY + 10 - (i * horizontalGridSpacing);
+            const x: number = this.chartOriginX - 50;
+            const y: number = this.chartOriginY + 10 - (i * this.horizontalGridSpacing);
             ctx.fillText(labelString, x - labelStringWdth / 2, y);
         }       
 
         const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        // The weather date is always in the timezone of the lat/lon
-        // 2022-03-18T04:00:00-06:00 - Denver
-        // If we just parse this with Date we get a GMT date and the label will be wrong when the GMT day does not match the lcoal day
-        // We use moment to correct this since it lets us specify the tz for the created moment
-
-        const firstMoment = moment(wData.timeString(0)).tz(weatherLocation.timeZone);
+        const firstMoment = moment(result.startTime);  // StartTime is in the timezone of the lat/lon
         
-        let labelDayIndex = firstMoment.day();
+        let labelDayIndex = firstMoment.day(); // 0-6 (Sun-Sat)
 
-        this.logger.verbose(`WeatherImage: First day: ${wData.timeString(0)}  ${labelDayIndex}  ${weekday[labelDayIndex]}`);
-        for (let i = 0; i < (hoursToShow / 24); i++) {
+        this.logger.verbose(`WeatherImage: First day:  ${labelDayIndex}  ${weekday[labelDayIndex]}`);
+        for (let i = 0; i < (this.hoursToShow / 24); i++) {
             const dayStr: string = weekday[labelDayIndex];
             const dayStrWdth: number = ctx.measureText(dayStr).width;
 
-            const x: number = chartOriginX + (i * 4 + 2) * verticalGridSpacing;
-            const y: number = chartOriginY + 40;
+            const x: number = this.chartOriginX + (i * 4 + 2) * this.verticalGridSpacing;
+            const y: number = this.chartOriginY + 40;
 
             ctx.fillText(dayStr, x - dayStrWdth / 2, y);
             labelDayIndex++;
@@ -374,38 +361,9 @@ export class WeatherImage {
                 labelDayIndex = 0;
         }
 
-        ctx.lineWidth = heavyStroke;
-
-        // Draw the temperature line
-        ctx.strokeStyle = temperatureColor;
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.temperature(0) * chartHeight) / fullScaleDegrees);
-        
-        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
-            ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.temperature(i) * chartHeight) / fullScaleDegrees);
-        }
-        ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.temperature(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
-        ctx.stroke();
-
-        // Draw the dew point line
-        ctx.strokeStyle = dewPointColor;
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.dewPoint(0) * chartHeight) / fullScaleDegrees);
-        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
-            ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.dewPoint(i) * chartHeight) / fullScaleDegrees);
-        }
-        ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.dewPoint(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);        
-        ctx.stroke();
-
-        // Draw the wind speed line
-        ctx.strokeStyle = windSpeedColor;
-        ctx.beginPath();
-        ctx.moveTo(chartOriginX + pointsPerHour * firstHour, chartOriginY - (wData.windSpeed(0) * chartHeight) / fullScaleDegrees);
-        for (let i =  1; i <= (hoursToShow - firstHour - 1); i++) {
-            ctx.lineTo(chartOriginX + pointsPerHour * (i + firstHour), chartOriginY - (wData.windSpeed(i) * chartHeight) / fullScaleDegrees);
-        }
-        ctx.lineTo(chartOriginX + pointsPerHour * hoursToShow, chartOriginY - (wData.windSpeed(hoursToShow - firstHour) * chartHeight) / fullScaleDegrees);
-        ctx.stroke();
+        this.plotLine(ctx, currentHour, wData, "temperature", temperatureColor, heavyStroke); 
+        this.plotLine(ctx, currentHour, wData, "dewpoint", dewPointColor, heavyStroke); 
+        this.plotLine(ctx, currentHour, wData, "windSpeed", windSpeedColor, heavyStroke); 
 
         const jpegImg = jpeg.encode(img, 50);
         

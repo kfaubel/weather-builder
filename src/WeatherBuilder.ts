@@ -31,7 +31,7 @@ export class WeatherBuilder {
 
             const weatherImage: WeatherImage = new WeatherImage(this.logger);
 
-            const result = await weatherImage.getImage(weatherLocation, userAgent);
+            const result = await weatherImage.getImage(weatherLocation.lat, weatherLocation.lon, weatherLocation.title, userAgent);
 
             if (result !== null) {                
                 this.logger.info(`WeatherBuilder: Writing: ${fileName}`);
@@ -41,7 +41,7 @@ export class WeatherBuilder {
                 return false;
             }
         } catch (e) {
-            this.logger.error(`WeatherBuilder: Exception: ${e}`);
+            this.logger.error(`WeatherBuilder: Exception: ${e as Error} ${(e as Error).stack}`);
             return false;
         }
 
