@@ -284,8 +284,13 @@ export class WeatherImage {
         ctx.fillStyle = windSpeedColor;
         ctx.fillText("Wind Speed", this.topLegendLeftIndent, 90);
 
-        const currentMoment = moment();
-        const currentHour = currentMoment.hour();
+        // Get the current moment in the timezone of the lat/lon
+        if (result.timeZone === undefined) {
+            this.logger.error(`WeatherImage: Timezone is not defined for ${lat},${lon}`);
+            return null;
+        }
+        const currentHour = moment.tz(result.timeZone).hour();
+
         this.logger.verbose(`WeatherImage: First hour: ${firstHour}, Current hour: ${currentHour}`);
 
         if (currentHour < firstHour) {

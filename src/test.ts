@@ -48,7 +48,7 @@ async function run() {
         days: 5
     };
    
-    const success: boolean = await weatherBuilder.CreateImages(weatherLocation3, USER_AGENT);
+    const success: boolean = await weatherBuilder.CreateImages(weatherLocation1, USER_AGENT);
 
     logger.info(`test.ts: Done: ${success ? "successfully" : "failed"}`); 
 

@@ -45,6 +45,7 @@ export interface WeatherDatasetInterface {
     firstHour: number;           // The first hour of the data set (0-23)  
     numberOfDataPoints: number;  // Number of data points in the data set 
     dataPoints: DataPoint[];     // First valid element is dataPoints[firstHour]
+    timeZone?: string;           // The timezone for the location
 }
 
 const numberofDataPoints = 121; // 121 data points, 0 to 120 inclusive, 0 is the first hour, 120 is the last hour
@@ -113,7 +114,8 @@ export class WeatherData {
                 startTime: observationLocalTime.format("YYYY-MM-DDTHH:mm:ss"),
                 firstHour: firstHour,
                 numberOfDataPoints: numberofDataPoints,
-                dataPoints: []
+                dataPoints: [],
+                timeZone: "America/Denver" //location.timeZone
             };
 
             // datapoints is an array of numberofDataPoints (121) elements
