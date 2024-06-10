@@ -94,7 +94,7 @@ export class WeatherData {
                 "User-Agent": this.userAgent, 
                 "Feature-Flags": ""
             },
-            timeout: 5000
+            timeout: 30000
         };
         
         try {
