@@ -60,7 +60,7 @@ export const getWeatherLocation = async (logger: LoggerInterface, lat: string, l
         timeZone: (locationJSON as any).properties.timeZone
     };
 
-    logger.verbose(`WeatherLocation: Data for ${lat},${lon}: ${JSON.stringify(location)}`);
+    //logger.verbose(`WeatherLocation: Data for ${lat},${lon}: ${JSON.stringify(location)}`);
 
     return location;
 };    

@@ -1,3 +1,4 @@
+/* eslint-disable indent */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import { LoggerInterface } from "./Logger";
@@ -41,14 +42,16 @@ export interface DataPoint {
 }
 
 export interface WeatherDatasetInterface {
-    startTime : string;          // ISO8601 date/time string for the first data point, in the local timezone for the lat/lon location
-    firstHour: number;           // The first hour of the data set (0-23)  
-    numberOfDataPoints: number;  // Number of data points in the data set 
-    dataPoints: DataPoint[];     // First valid element is dataPoints[firstHour]
+    dataPoints: DataPoint[];     // 121 elements (145-24) starting a midnight of the current day
     timeZone?: string;           // The timezone for the location
 }
 
-const numberofDataPoints = 121; // 121 data points, 0 to 120 inclusive, 0 is the first hour, 120 is the last hour
+// 5 days going forward and one day of past data plus the midnight of the last day (6x24 + 1 = 145)
+// Point 0 is midnight of the previous day.
+// Point 24 is midnight of the current day
+// Point 145 is midnight of the last day (same as midnight at the start of the 6th day).
+// Note: Before we return this, we will slice off the first 24 hours of data (yesterday)
+const numberofDataPoints = 145;  
 
 // New data source : https://www.weather.gov/documentation/services-web-api
 
@@ -68,7 +71,7 @@ export class WeatherData {
 
     /**
      * getWeatherData() - Get the weather data for the location
-     * The data is an array of 121 elements, each element is a DataPoint object containing fields like 
+     * The data is an array of 121 elements, each element is a DataPoint object
      * @returns WeatherDatasetInterface or null if there is an error
      */
     public getWeatherData = async (): Promise<WeatherDatasetInterface | null> => {
@@ -85,8 +88,7 @@ export class WeatherData {
 
         const url =`https://api.weather.gov/gridpoints/${location.gridId}/${location.gridX},${location.gridY}`;
         
-        this.logger.verbose(`WeatherData: Getting data for: lat=${this.lat}, lon=${this.lon}, Agent: ${this.userAgent}`);
-        this.logger.verbose(`WeatherData: GET URL: ${url}`);
+        this.logger.verbose(`WeatherData: Getting data for: lat=${this.lat}, lon=${this.lon}, URL: ${url}`);
 
         const options: AxiosRequestConfig = {
             headers: {
@@ -102,29 +104,19 @@ export class WeatherData {
             const res: AxiosResponse = await axios.get(url, options);
             const weatherJSON: NoaaWeatherResponse = res.data;
             const endTime = new Date();
-            this.logger.verbose(`WeatherData: GET TIME: ${endTime.getTime() - startTime.getTime()}ms`);
-        
-            const observationTimeStr = weatherJSON.properties.validTimes.split("/")[0];
-            const observationLocalTime = moment.utc(observationTimeStr).tz(location.timeZone);
-            this.logger.verbose(`WeatherData: Observation Local Time: ${observationLocalTime.format("YYYY-MM-DDTHH:mm:ss")}`);
-        
+            this.logger.verbose(`WeatherData: GET TIME: ${endTime.getTime() - startTime.getTime()}ms`);        
             
-            const firstHour: number = observationLocalTime.hour(); // 0-23
             const dataSet: WeatherDatasetInterface = {
-                startTime: observationLocalTime.format("YYYY-MM-DDTHH:mm:ss"),
-                firstHour: firstHour,
-                numberOfDataPoints: numberofDataPoints,
                 dataPoints: [],
-                timeZone: "America/Denver" //location.timeZone
+                timeZone: location.timeZone
             };
 
-            // datapoints is an array of numberofDataPoints (121) elements
-            // Element 0 is midnight on the first day, Element 120 is 11PM on the last day
-            // Since we are pulling data during the day, some of the first elements will havc 0s
-            // The first valid element is dataPoints[firstHour]
+            // datapoints is an array of numberofDataPoints (145) elements
+            // Element 0 is midnight yesterday, 24 is midnight this morning, 145 is midnight on the 6th dayy
+            // Initialize all of the datapoints, most will be overwritten but not all
+            // We will remove the first 24 hours of data (yesterday) before returning the data
             for (let i = 0; i < numberofDataPoints; i++) {
                 const dataPoint: DataPoint = {
-                    //time: observationLocalTime.add(i, "hour").format("YYYY-MM-DDTHH:mm:ss"),
                     index: i,
                     temperature: 0,
                     dewpoint: 0,
@@ -138,41 +130,56 @@ export class WeatherData {
                 dataSet.dataPoints.push(dataPoint);
             }
 
+            // The data we get from the NWS may start with yesterday's data
+            // Each property (temperature, dewpoint, ...) can start at different times
+            // A period string P1D0D can start yesterday and continue into today
+            // We *assume* that data will not start before yesterday (UTC)
+
             // Interate over the elements we want to extract from the JSON and fill in the dataArray
             for (const elementName of ["temperature", "dewpoint", "skyCover", "probabilityOfPrecipitation", "windSpeed", "quantitativePrecipitation", "snowfallAmount"]) {
+                this.logger.verbose(`WeatherData: Processing element: ${elementName}`);
+
                 const element = weatherJSON.properties[elementName as keyof NoaaWeatherResponse["properties"]] as NoaaForecastSet;
                 if (element === undefined) {
                     this.logger.warn(`WeatherData: Element ${elementName} not found in JSON.`);
                     return null;
                 }
 
-                let index = firstHour;
-
                 // Check if the element variable is an object
                 if (typeof element !== "object") {
-                    throw new TypeError("KTF: element is not an object");
+                    throw new TypeError("WeatherData: element is not an object");
                 }
                 
                 // Check if the values property exists on the element object
                 if (!Object.prototype.hasOwnProperty.call(element, "values")) {
-                    throw new TypeError("KTF: element does not have a values property");
+                    throw new TypeError("WeatherData: element does not have a values property");
                 }
 
+                // First, find the first slot for the element we are processing
+                let index = this.getFirstIndex(element.values[0].validTime, location.timeZone);
+
+                if (index === null) {
+                    this.logger.warn(`WeatherData: Element ${elementName} firstTime is null. Aborting.`);
+                    return null;
+                }  
+
                 for (const value of element.values) {
+
                     if (index >= numberofDataPoints) {
                         // We have processed all the data points we need
                         break;
                     }
 
-                    // Each value has a validTime and a value: "2024-05-10T04:00:00+00:00/PT2H",
-                    // We need the period part (PT2H) and we will strip the "PT" and the "H" to get the number of hours
-                    let periodStr = value.validTime.split("/")[1];  // get just the PT1H part
-                    periodStr = periodStr.split("PT")[1]; // Take all but the initial 'PT'
-                    periodStr = periodStr.split("H")[0];  // Take all but the final 'H'
-                    const periods = parseInt(periodStr);  // periods is the number of hours 1-24
+                    // Get the number of periods partof the validTime string after the '/' (e.g.: "2024-06-12T03:00:00+00:00/PT1H")
+                    const periods = this.getPeriodsFromPeriodString(value.validTime.split("/")[1]);
+                    
+                    if (periods === null) {
+                        this.logger.warn(`WeatherData: Element ${elementName} Unknown period ${value.validTime.split("/")[1]}`);
+                        return null;
+                    }
 
                     if (isNaN(periods)) {
-                        this.logger.warn(`WeatherData: Element ${elementName} Unknown period ${periodStr}`);
+                        this.logger.warn(`WeatherData: Element ${elementName} Unknown period ${value.validTime.split("/")[1]}`);
                         return null;
                     }
 
@@ -209,15 +216,86 @@ export class WeatherData {
                         }
                     }
                 }
-
-                this.logger.verbose(`WeatherData: Processed Element ${elementName} processed.`);
             }
             
             // this.logger.verbose(`WeatherData: Data: ${JSON.stringify(dataSet, null, 4)}`);
+            dataSet.dataPoints = dataSet.dataPoints.slice(24);  // Remove the first 24 hours of data (yesterday)
             return dataSet;
     
         } catch (error: any) {
-            this.logger.warn(`WeatherData: GET Error: ${error}`);
+            this.logger.warn(`WeatherData: GET Error: ${error.stack}`);
+            return null;
+        }
+    };
+
+    /**
+     * getPeriodsFromPeriodString
+     *   Strings of this form are supported: "PT1H".."PT24H", "P1D", "P1DT1H".."P2DT24H"
+     * @param periodStr - ISO 8601 period string
+     * @returns number of periods in the string or null if the string is not recognized
+     */
+    private getPeriodsFromPeriodString = (periodStr: string): number | null => {
+        let periods = 0;
+
+        try {
+            // this.logger.verbose(`WeatherData: *** getPeriodsFromPeriodString: ${periodStr}`);
+            periodStr = periodStr.split("P")[1];  // Strip the initial 'P'
+
+            // periodStr may have 2 parts separated by the 'T' character.  The first part is the number of days, the second part is the number of hours
+            let periodDayStr = "";
+            let periodHourStr = "";
+            if (periodStr.includes("T")) {
+                // If there is a 'T' character, then the string at least has a time part, the day part may be empty
+                periodDayStr = periodStr.split("T")[0]; // The part before the 'T' can be: "", "1D', "2D", ...
+                periodHourStr = periodStr.split("T")[1]; // The part after the 'T' can be: "", "1H", "2H", ...
+            } else {
+                // If there is no 'T' character, then the entire string is the number of days
+                periodDayStr = periodStr;
+            }
+
+            if (periodDayStr !== "") {
+                const days = parseInt(periodDayStr.split("D")[0]);  // if the periodDayStr is 1D, we want the int 1
+                if (isNaN(days)) {
+                    this.logger.warn(`WeatherData: Unknown days from periodStr: ${periodStr}`);
+                    return null;
+                }
+                periods += days * 24;  // Add the number of days * 24 to periods
+            }
+
+            if (periodHourStr !== "") {
+                const hours = parseInt(periodHourStr.split("H")[0]);  // if the periodHourStr is 4H, we want the int 4
+                if (isNaN(hours)) {
+                    this.logger.warn(`WeatherData: Unknown hours from periodStr: ${periodStr}`);
+                    return null;
+                }
+                periods += hours;  // Add the number of hours to periods
+            }
+        } catch (error: any) {
+            this.logger.warn(`WeatherData: getPeriodsFromPeriodString for ${periodStr}, Error: ${error.stack}`);
+            return null;
+        }
+
+        return periods;
+    };
+
+    /** */
+    private getFirstIndex = (firstDateStr: string, localTimezone: string): number | null => {
+        const firstTime = moment.utc(firstDateStr.split("/")[0]);  // e.g.: "2024-06-12T03:00:00+00:00" UTC
+        const firstTimeLocal = firstTime.tz(localTimezone);
+
+        // Check to see if the firstTimeLocal is yesterday or today in the local timezone
+        // Note: startOf() mutates the moment object so we need to clone it first
+        const firstTimeLocalStart = firstTimeLocal.clone().startOf("day");
+        const todayLocal = moment().tz(localTimezone).startOf("day");
+        if (firstTimeLocalStart.isBefore(todayLocal)) {
+            // The firstTime is before today, assume it is yesterday
+            return firstTimeLocal.hour();
+        } else if (firstTimeLocalStart.isSame(todayLocal)) {
+            // The firstTime is today.  Start in slots 24-47
+            return firstTimeLocal.hour() + 24;
+        } else {
+            this.logger.warn(`WeatherData: firstTimeLocalStart: ${firstTimeLocalStart}`);
+            this.logger.warn(`WeatherData: todayLocal:          ${todayLocal}. Aborting.`);
             return null;
         }
     };

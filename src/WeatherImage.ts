@@ -124,7 +124,7 @@ export class WeatherImage {
         let nextY = 0;
         ctx.beginPath();
         ctx.moveTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY);          // Start at baseline 
-        ctx.lineTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY - (wData[currentHour]?.[dataField] ?? 0) * this.pointsPerDegree);  // Draw up to the first point
+        ctx.lineTo(this.chartOriginX + currentHour * this.pointsPerHour, this.chartOriginY - (wData[currentHour + 24]?.[dataField] ?? 0) * this.pointsPerDegree);  // Draw up to the first point
         
         for (let i = currentHour + 1; i < (this.hoursToShow); i++) {
             nextX = this.chartOriginX + i * this.pointsPerHour;
@@ -209,19 +209,20 @@ export class WeatherImage {
      * @returns Buffer with the image data
      */
     public async getImage(lat: string, lon: string, title: string, userAgent: string): Promise<Buffer | null> {
-        this.logger.verbose(`WeatherImage: request for ${lat},${lon} ${title}`);
+        this.logger.info(`WeatherImage: request for ${lat},${lon} ${title}`);
         
         this.weatherData = new WeatherData(this.logger, lat, lon, userAgent);
         const result: WeatherDatasetInterface | null = await  this.weatherData.getWeatherData();
         if (!result) {
             return null;
         }
+
+        // this.logger.verbose(JSON.stringify(result, null, 4));
         
         // Data element 0 is midnight of the first day.  
         // The first valid data is at result.dataPoints[firstHour]
         // We start the plot at result.dataPoints[currentHour]
         const wData = result.dataPoints;
-        const firstHour = result.firstHour;
         
         const largeFont  = "48px 'OpenSans-Bold'";   // Title
         const mediumFont = "36px 'OpenSans-Bold'";   // axis labels
@@ -289,14 +290,8 @@ export class WeatherImage {
             this.logger.error(`WeatherImage: Timezone is not defined for ${lat},${lon}`);
             return null;
         }
-        const currentHour = moment.tz(result.timeZone).hour();
-
-        this.logger.verbose(`WeatherImage: First hour: ${firstHour}, Current hour: ${currentHour}`);
-
-        if (currentHour < firstHour) {
-            this.logger.verbose(`WeatherImage: Current hour ${currentHour} is before first hour ${firstHour}, aborting image creation`);
-            return null;
-        }
+        const currentHour = moment.tz(result.timeZone).hour();  
+        this.logger.verbose(`WeatherImage: Current hour: ${currentHour} in location timezone ${result.timeZone}`); 
         
         // Draw the cloud cover in the background (filled)
         this.drawShadedArea(ctx, currentHour, wData, "skyCover", "rgb(50, 50, 50)");
@@ -348,11 +343,10 @@ export class WeatherImage {
         }       
 
         const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        const firstMoment = moment(result.startTime);  // StartTime is in the timezone of the lat/lon
-        
-        let labelDayIndex = firstMoment.day(); // 0-6 (Sun-Sat)
 
-        this.logger.verbose(`WeatherImage: First day:  ${labelDayIndex}  ${weekday[labelDayIndex]}`);
+        // Get the day (0..6) for today in the timezone of the location
+        let labelDayIndex = moment().tz(result.timeZone).day();
+
         for (let i = 0; i < (this.hoursToShow / 24); i++) {
             const dayStr: string = weekday[labelDayIndex];
             const dayStrWdth: number = ctx.measureText(dayStr).width;
