@@ -27,7 +27,7 @@ export class WeatherBuilder {
 
     public async CreateImages(weatherLocation: WeatherLocation, userAgent: string): Promise<boolean>{
         try {
-            const fileName = `${weatherLocation.name}.jpg`;
+            const fileName = `${weatherLocation.name}Graph.jpg`;
 
             const weatherImage: WeatherImage = new WeatherImage(this.logger);
 
